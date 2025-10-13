@@ -1,3 +1,46 @@
 {
-  "placeholderImages": []
+  "placeholderImages": [
+    {
+      "id": "student-avatar",
+      "description": "Student avatar",
+      "imageUrl": "https://picsum.photos/seed/student-avatar/100/100",
+      "imageHint": "person portrait"
+    },
+    {
+      "id": "admin-avatar",
+      "description": "Admin avatar",
+      "imageUrl": "https://picsum.photos/seed/admin-avatar/100/100",
+      "imageHint": "person suit"
+    },
+    {
+      "id": "superadmin-avatar",
+      "description": "Super admin avatar",
+      "imageUrl": "https://picsum.photos/seed/superadmin-avatar/100/100",
+      "imageHint": "person professional"
+    },
+    {
+      "id": "anonymous-avatar",
+      "description": "Anonymous avatar",
+      "imageUrl": "https://picsum.photos/seed/anonymous-avatar/100/100",
+      "imageHint": "abstract pattern"
+    },
+    {
+      "id": "user-avatar-1",
+      "description": "User avatar 1",
+      "imageUrl": "https://picsum.photos/seed/user-avatar-1/100/100",
+      "imageHint": "person face"
+    },
+    {
+      "id": "user-avatar-2",
+      "description": "User avatar 2",
+      "imageUrl": "https://picsum.photos/seed/user-avatar-2/100/100",
+      "imageHint": "person smiling"
+    },
+    {
+      "id": "user-avatar-3",
+      "description": "User avatar 3",
+      "imageUrl": "https://picsum.photos/seed/user-avatar-3/100/100",
+      "imageHint": "person glasses"
+    }
+  ]
 }
