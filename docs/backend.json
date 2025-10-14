@@ -135,6 +135,19 @@
         "voteId"
       ]
     },
+    "UserVote": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "User Vote",
+      "description": "A document representing a single vote by a user on a suggestion.",
+      "type": "object",
+      "properties": {
+          "suggestionId": {
+              "type": "string",
+              "description": "The ID of the suggestion that was voted on."
+          }
+      },
+      "required": ["suggestionId"]
+    },
     "Comment": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Comment",
@@ -229,6 +242,26 @@
         }
       },
       {
+        "path": "/user_votes/{uid}/suggestions/{suggestionId}",
+        "definition": {
+          "entityName": "UserVote",
+          "schema": {
+            "$ref": "#/backend/entities/UserVote"
+          },
+          "description": "A subcollection to track which suggestions a user has voted for. This allows for efficient and secure checking of a user's vote status.",
+          "params": [
+            {
+                "name": "uid",
+                "description": "The unique identifier of the user."
+            },
+            {
+                "name": "suggestionId",
+                "description": "The unique identifier of the suggestion."
+            }
+          ]
+        }
+      },
+      {
         "path": "/comments/{commentId}",
         "definition": {
           "entityName": "Comment",
@@ -248,3 +281,5 @@
     "reasoning": "The Firestore data structure is designed to ensure security, scalability, and debuggability, while adhering to Authorization Independence. The core principle is to avoid hierarchical authorization dependencies by denormalizing data and utilizing structural segregation for homogeneous security postures. The structure incorporates explicit state modeling for clarity and predictable schemas.\n\nAuthorization Independence is achieved by storing the 'role' property directly within the `/users/{uid}` document. This eliminates the need for `get()` calls in security rules to determine user roles. For the suggestions, the `authorUid` field is used, allowing for anonymous submissions via the 'ANONYMOUS' string literal. The `suggestions` documents do not depend on any data outside themselves for authorization decisions.\n\nQAPs (Rules are not Filters) are supported by segregating data based on access needs and using membership models. Read access is granted broadly on `/suggestions` as read access is required by all users, including unauthenticated ones. Write/Update access is limited through security rules based on the user's role which is checked by reading the `/users/{uid}` collection. The use of the `/votes` collection ensures that a user can only vote once per suggestion. Each vote document contains both `suggestionId` and `voterUid`, providing a clear link between the suggestion and the user who voted, which is essential for the `triggerVoteUpdate` Cloud Function.\n\nInvariants are maintained through the enforcement of ownership for user-specific data via path-based rules for the `/users/{uid}` collection. Timestamps are automatically generated and are immutable. Data integrity is also ensured through the custom claims mechanism, which is securely set server-side."
   }
 }
+
+    

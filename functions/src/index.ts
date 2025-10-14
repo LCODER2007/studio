@@ -7,11 +7,19 @@ export const triggerVoteUpdate = functions.firestore
   .document("votes/{voteId}")
   .onCreate(async (snap) => {
     const vote = snap.data();
-    const suggestionId = vote.suggestionId;
-    const suggestionRef = admin.firestore().collection("suggestions").doc(suggestionId);
+    const { suggestionId, voterUid } = vote;
 
-    return suggestionRef.update({
+    // Increment the upvotes count on the suggestion
+    const suggestionRef = admin.firestore().collection("suggestions").doc(suggestionId);
+    await suggestionRef.update({
       upvotesCount: admin.firestore.FieldValue.increment(1),
+    });
+
+    // Record the vote in the user's private collection
+    const userVoteRef = admin.firestore().collection("user_votes").doc(voterUid).collection("suggestions").doc(suggestionId);
+    return userVoteRef.set({
+        suggestionId: suggestionId,
+        timestamp: vote.timestamp,
     });
   });
 
@@ -60,3 +68,5 @@ export const triggerStatusNotification = functions.firestore
     }
     return null;
   });
+
+    

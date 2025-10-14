@@ -27,12 +27,12 @@ export default function SuggestionList() {
 
   const { data: suggestions, isLoading } = useCollection<Suggestion>(suggestionsQuery);
 
-  const votesQuery = useMemoFirebase(() => {
+  const userVotesQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
-    return collection(firestore, 'votes');
+    return collection(firestore, 'user_votes', user.uid, 'suggestions');
   }, [firestore, user]);
-  const { data: votes } = useCollection(votesQuery);
-  const upvotedIds = useMemo(() => new Set(votes?.filter(v => v.voterUid === user?.uid).map(v => v.suggestionId) || []), [votes, user]);
+  const { data: userVotes } = useCollection(userVotesQuery);
+  const upvotedIds = useMemo(() => new Set(userVotes?.map(v => v.id) || []), [userVotes]);
 
 
   const handleOpenSubmitDialog = () => {
@@ -142,3 +142,5 @@ export default function SuggestionList() {
     </>
   );
 }
+
+    
