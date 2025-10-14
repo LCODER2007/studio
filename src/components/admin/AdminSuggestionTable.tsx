@@ -39,9 +39,10 @@ import { format } from "date-fns";
 interface AdminSuggestionTableProps {
     suggestions: Suggestion[];
     onEdit: (suggestion: Suggestion) => void;
+    onFilterStatusChange: (status: string) => void;
 }
 
-export default function AdminSuggestionTable({ suggestions, onEdit }: AdminSuggestionTableProps) {
+export default function AdminSuggestionTable({ suggestions, onEdit, onFilterStatusChange }: AdminSuggestionTableProps) {
   const [sorting, setSorting] = React.useState<SortingState>([
     { id: "submissionTimestamp", desc: true },
   ]);
@@ -79,7 +80,11 @@ export default function AdminSuggestionTable({ suggestions, onEdit }: AdminSugge
     {
         accessorKey: "upvotesCount",
         header: "Upvotes",
-        cell: ({ row }) => <div className="text-center">{row.getValue("upvotesCount")}</div>,
+        cell: ({ row }) => {
+            const suggestion = row.original;
+            const showUpvotes = suggestion.status === 'SHORTLISTED' || suggestion.status === 'IMPLEMENTED';
+            return <div className="text-center">{showUpvotes ? row.getValue("upvotesCount") : "-"}</div>
+        },
     },
     {
         id: "avgScore",
@@ -151,7 +156,10 @@ export default function AdminSuggestionTable({ suggestions, onEdit }: AdminSugge
             <DropdownMenuContent align="end">
                 <DropdownMenuCheckboxItem
                     checked={!table.getColumn("status")?.getFilterValue()}
-                    onCheckedChange={() => table.getColumn("status")?.setFilterValue(undefined)}
+                    onCheckedChange={() => {
+                        table.getColumn("status")?.setFilterValue(undefined)
+                        onFilterStatusChange('all');
+                    }}
                 >
                     All Statuses
                 </DropdownMenuCheckboxItem>
@@ -160,7 +168,10 @@ export default function AdminSuggestionTable({ suggestions, onEdit }: AdminSugge
                         key={status}
                         className="capitalize"
                         checked={(table.getColumn("status")?.getFilterValue() as string) === status}
-                        onCheckedChange={() => table.getColumn("status")?.setFilterValue(status)}
+                        onCheckedChange={() => {
+                            table.getColumn("status")?.setFilterValue(status)
+                            onFilterStatusChange(status)
+                        }}
                     >
                         {status.replace(/_/g, " ").toLowerCase()}
                     </DropdownMenuCheckboxItem>

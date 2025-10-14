@@ -49,6 +49,8 @@ export default function SuggestionCard({ suggestion, onUpvote, hasUpvoted }: Sug
   
   const suggestionLink = `/suggestion/${suggestion.suggestionId}`;
 
+  const showUpvotes = suggestion.status === 'SHORTLISTED' || suggestion.status === 'IMPLEMENTED';
+
   return (
     <Card className="flex flex-col h-full transition-all hover:shadow-md">
         <Link href={suggestionLink} className="flex flex-col flex-grow">
@@ -102,9 +104,11 @@ export default function SuggestionCard({ suggestion, onUpvote, hasUpvoted }: Sug
         >
           <ArrowUp className={cn("mr-2 h-4 w-4", hasUpvoted ? "transform scale-125" : "group-hover:animate-bounce")} />
           <span>Upvote</span>
-          <span className="ml-2 tabular-nums">
-            {suggestion.upvotesCount}
-          </span>
+          {showUpvotes && (
+            <span className="ml-2 tabular-nums">
+              {suggestion.upvotesCount}
+            </span>
+          )}
         </Button>
         <Link href={suggestionLink} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary">
             <MessageSquare className="h-4 w-4" />
