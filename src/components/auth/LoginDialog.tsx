@@ -20,19 +20,15 @@ interface LoginDialogProps {
 export function LoginDialog({ open, onOpenChange }: LoginDialogProps) {
   const auth = useFirebaseAuth();
 
-  const handleLogin = (role: 'STUDENT' | 'ADMIN' | 'SUPER_ADMIN') => {
+  const handleLogin = (role: 'ADMIN' | 'SUPER_ADMIN') => {
     let email, password;
     switch(role) {
-      case 'STUDENT':
-        email = 'student@unilag.edu';
-        password = 'password';
-        break;
       case 'ADMIN':
-        email = 'sees-admin@unilag.edu';
+        email = 'admin@unilag.edu';
         password = 'password';
         break;
       case 'SUPER_ADMIN':
-        email = 'super@unilag.edu';
+        email = 'super-admin@unilag.edu';
         password = 'password';
         break;
     }
@@ -54,13 +50,10 @@ export function LoginDialog({ open, onOpenChange }: LoginDialogProps) {
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
-          <Button onClick={() => handleLogin("STUDENT")}>
-            <LogIn className="mr-2 h-4 w-4" /> Sign In as Student
-          </Button>
           <Button variant="secondary" onClick={() => handleLogin("ADMIN")}>
             <LogIn className="mr-2 h-4 w-4" /> Sign In as Admin
           </Button>
-          <Button variant="secondary" onClick={() => handleLogin("SUPER_ADMIN")}>
+          <Button variant="destructive" onClick={() => handleLogin("SUPER_ADMIN")}>
             <LogIn className="mr-2 h-4 w-4" /> Sign In as Super Admin
           </Button>
         </div>
