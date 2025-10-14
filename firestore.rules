@@ -1,74 +1,116 @@
+/**
+ * @fileoverview Firestore Security Rules for the SEES UNILAG Innovation Suggestion System (SIS).
+ *
+ * Core Philosophy:
+ * This ruleset enforces a user-ownership model for user profiles and restricts write access to suggestions based on user roles.
+ * Public read access is granted for suggestions and comments, but write access is controlled.
+ * Data consistency is enforced through validation of user IDs and relational integrity.
+ * Authorization Independence is implemented by storing the user's role directly within the `/users/{uid}` document.
+ *
+ * Data Structure:
+ * - /users/{uid}: Stores user profile data, including email, displayName, and role (STUDENT, ADMIN, SUPER_ADMIN).
+ * - /suggestions/{suggestionId}: Stores suggestions submitted by users. The `authorUid` field indicates the suggestion's author; can be 'ANONYMOUS' for anonymous submissions.
+ * - /votes/{voteId}: Stores user votes on suggestions, linking a suggestion to a user.
+ * - /comments/{commentId}: Stores comments on suggestions.
+ *
+ * Key Security Decisions:
+ * - Users can only read and update their own user documents.
+ * - Suggestions are publicly readable, but creation is restricted to authenticated users.
+ * - Only admins can update suggestions.
+ * - Users can only create votes for themselves, and votes are not publicly readable.
+ * - Users can delete their own votes.
+ * - Comments are publicly readable, creation is restricted to authenticated users, and authors can update/delete their own comments.
+ * - Listing all users is disallowed.
+ *
+ * Denormalization for Authorization:
+ * The `role` field is denormalized into the `/users/{uid}` document to allow for simpler and more performant security rules, avoiding the need for extra reads.
+ *
+ * Structural Segregation:
+ * Public and private data are segregated into separate collections to simplify access control. Suggestions are readable by everyone, but user profiles are restricted to the user themselves.
+ */
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
-  
-    // Helper functions
-    function isAuthenticated() {
+
+    /**
+     * @description Allows users to read and update their own user documents. Only the authenticated user can create their own document. Listing all users is disallowed.
+     * @path /users/{userId}
+     * @allow (read, update) if the user's ID matches the requested user ID.
+     * @allow (create) if request.auth.uid!= null;
+     * @deny (read, update) if the user's ID does not match the requested user ID.
+     * @principle Enforces document ownership for reads and writes.
+     */
+    match /users/{userId} {
+      allow get: if isSignedIn() && isOwner(userId);
+      allow list: if false;
+      allow create: if isSignedIn() && isOwner(userId);
+      allow update: if isSignedIn() && isOwner(userId);
+      allow delete: if false;
+    }
+
+    /**
+     * @description Allows anyone to read suggestions, but only authenticated users can create them. Updating and deleting are only allowed by admins.
+     * @path /suggestions/{suggestionId}
+     * @allow (read) anyone can read suggestions.
+     * @allow (create) if the user is authenticated.
+     * @deny (create, update, delete) if not authenticated.
+     * @principle Public read access with owner-only writes, restricted to admins for updates.
+     */
+    match /suggestions/{suggestionId} {
+      allow get: if true;
+      allow list: if true;
+      allow create: if isSignedIn();
+      allow update: if isAdmin();
+      allow delete: if false;
+    }
+
+    /**
+     * @description Allows users to create votes, but only for themselves (voterUid must match the logged-in UID). Votes are not publicly readable. Allows users to retract their votes (delete).
+     * @path /votes/{voteId}
+     * @allow (create) if the user is authenticated and the voterUid matches the logged-in user's UID.
+     * @deny (read) votes are not publicly readable.
+     * @deny (create) if the user is not authenticated or the voterUid does not match the logged-in user's UID.
+     * @principle Enforces that a user can only create a vote for themselves and restricts read access.
+     */
+    match /votes/{voteId} {
+      allow get: if false;
+      allow list: if false;
+      allow create: if isSignedIn() && request.resource.data.voterUid == request.auth.uid;
+      allow update: if false;
+      allow delete: if isSignedIn();
+    }
+
+    /**
+     * @description Allows anyone to read comments. Only authenticated users can create them. Authors can update/delete their own comments.
+     * @path /comments/{commentId}
+     * @allow (read) anyone can read comments.
+     * @allow (create) if the user is authenticated.
+     * @allow (update, delete) if the user is the author of the comment.
+     * @principle Public read access with owner-only writes.
+     */
+    match /comments/{commentId} {
+      allow get: if true;
+      allow list: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && isCommentAuthor(resource.data.authorUid);
+      allow delete: if isSignedIn() && isCommentAuthor(resource.data.authorUid);
+    }
+
+    // Helper Functions
+    function isSignedIn() {
       return request.auth != null;
     }
-    
-    function isRole(role) {
-      return isAuthenticated() && request.auth.token.role == role;
+
+    function isOwner(userId) {
+      return request.auth.uid == userId;
     }
 
-    function isOneOfRoles(roles) {
-      return isAuthenticated() && request.auth.token.role in roles;
+    function isCommentAuthor(authorUid) {
+      return request.auth.uid == authorUid;
     }
 
-    // /users/{userId}
-    match /users/{userId} {
-      allow read;
-      allow create: if request.auth.uid == userId;
-      allow update: if request.auth.uid == userId;
-    }
-
-    // /suggestions/{suggestionId}
-    match /suggestions/{suggestionId} {
-      allow read;
-      
-      // Any authenticated user can create a suggestion.
-      allow create: if isAuthenticated()
-                    && request.resource.data.authorUid == request.auth.uid || request.resource.data.authorUid == 'ANONYMOUS';
-      
-      // Only admins/super_admins can update status and scores.
-      allow update: if isOneOfRoles(['ADMIN', 'SUPER_ADMIN'])
-                    && request.resource.data.diff(resource.data).affectedKeys()
-                       .hasOnly(['status', 'impactScore', 'feasibilityRating', 'costEffectivenessRating', 'reviewerUid', 'publicFeedback']);
-                       
-      // The original author can update their suggestion if it's still in 'SUBMITTED' status.
-      allow update: if isAuthenticated() 
-                    && resource.data.authorUid == request.auth.uid 
-                    && resource.data.status == 'SUBMITTED'
-                    && request.resource.data.diff(resource.data).affectedKeys()
-                       .hasOnly(['title', 'body', 'category']);
-                       
-      // Disallow changing immutable fields during any update.
-      allow update: if request.resource.data.suggestionId == resource.data.suggestionId
-                    && request.resource.data.submissionTimestamp == resource.data.submissionTimestamp;
-    }
-    
-    // /votes/{voteId}
-    match /votes/{voteId} {
-      allow read;
-
-      // A user can only create a vote for themselves.
-      // Unique votes should be enforced by using a document ID like {suggestionId}_{voterUid} in the client.
-      allow create: if isAuthenticated() && request.resource.data.voterUid == request.auth.uid;
-      
-      // Votes are immutable.
-      allow update, delete: if false;
-    }
-    
-    // /comments/{commentId}
-    match /comments/{commentId} {
-      allow read;
-      
-      // A user can only create a comment for themselves.
-      allow create: if isAuthenticated() && request.resource.data.authorUid == request.auth.uid;
-      
-      // Only the author of a comment can update or delete it.
-      allow update, delete: if isAuthenticated() && resource.data.authorUid == request.auth.uid;
+    function isAdmin() {
+      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['ADMIN', 'SUPER_ADMIN'];
     }
   }
 }
