@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { FileText, Lightbulb } from 'lucide-react';
+import React, { useEffect } from 'react';
 
 import {
   SidebarProvider,
@@ -24,17 +25,18 @@ export default function AdminDashboardLayout({ children }: { children: React.Rea
     const pathname = usePathname();
     const router = useRouter();
 
-    if (loading) {
+    useEffect(() => {
+        if (!loading && !user) {
+            router.push('/login');
+        }
+    }, [loading, user, router]);
+
+    if (loading || !user) {
         return (
             <div className="flex items-center justify-center h-screen">
                 <div className="text-lg animate-pulse">Loading Dashboard...</div>
             </div>
         );
-    }
-    
-    if (!loading && !user) {
-        router.push('/login');
-        return null;
     }
   
   return (
