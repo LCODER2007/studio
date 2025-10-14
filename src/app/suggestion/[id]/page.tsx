@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useMemo } from 'react';
@@ -29,6 +28,7 @@ export default function SuggestionPage() {
 
     const commentsQuery = useMemoFirebase(() => {
         if (!firestore || !suggestionId) return null;
+        // This query fetches comments specifically for the current suggestion, ordered by time.
         return query(collection(firestore, 'comments'), where('suggestionId', '==', suggestionId), orderBy('timestamp', 'asc'));
     }, [firestore, suggestionId]);
     const { data: comments, isLoading: isLoadingComments } = useCollection<CommentType>(commentsQuery);
@@ -44,16 +44,18 @@ export default function SuggestionPage() {
         }
 
         const commentRef = doc(collection(firestore, 'comments'));
-        const newComment: Omit<CommentType, 'commentId'> = {
+        const newComment: Omit<CommentType, 'commentId' | 'timestamp'> & { timestamp: any } = {
             suggestionId: suggestionId,
             authorUid: user.uid,
             authorDisplayName: user.displayName || 'Anonymous',
             authorPhotoURL: user.photoURL,
             body: commentBody,
-            timestamp: serverTimestamp(),
+            timestamp: serverTimestamp(), // Use server timestamp for consistency
         };
 
+        // The 'commentId' is now added right before the document is created.
         addDocumentNonBlocking(commentRef, { ...newComment, commentId: commentRef.id });
+
         toast({
             title: "Comment Added!",
             description: "Your comment has been posted.",
@@ -62,7 +64,7 @@ export default function SuggestionPage() {
 
     if (isLoadingSuggestion || isLoadingComments) {
         return (
-            <div className="flex flex-col min-h-screen">
+            <div className="flex flex-col min-h-screen bg-background">
                 <Header />
                 <main className="flex-1 container mx-auto px-4 py-8">
                     <div className="text-center">
@@ -75,7 +77,7 @@ export default function SuggestionPage() {
 
     if (!suggestion) {
         return (
-            <div className="flex flex-col min-h-screen">
+            <div className="flex flex-col min-h-screen bg-background">
                 <Header />
                 <main className="flex-1 container mx-auto px-4 py-8">
                     <div className="text-center">

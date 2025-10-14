@@ -22,16 +22,16 @@ export default function CommentList({ comments }: CommentListProps) {
                 <div key={comment.commentId} className="flex items-start gap-4">
                     <Avatar>
                         <AvatarImage src={comment.authorPhotoURL ?? ''} />
-                        <AvatarFallback>{comment.authorDisplayName.charAt(0)}</AvatarFallback>
+                        <AvatarFallback>{comment.authorDisplayName?.charAt(0) || 'A'}</AvatarFallback>
                     </Avatar>
                     <div className="flex-1">
                         <div className="flex items-center gap-2">
                             <p className="font-semibold">{comment.authorDisplayName}</p>
                             <p className="text-xs text-muted-foreground">
-                                {comment.timestamp && formatDistanceToNow(comment.timestamp.toDate(), { addSuffix: true })}
+                                {comment.timestamp && comment.timestamp.toDate ? formatDistanceToNow(comment.timestamp.toDate(), { addSuffix: true }) : 'just now'}
                             </p>
                         </div>
-                        <p className="text-sm text-foreground/90 mt-1">{comment.body}</p>
+                        <p className="text-sm text-foreground/90 mt-1 whitespace-pre-wrap">{comment.body}</p>
                     </div>
                 </div>
             ))}
