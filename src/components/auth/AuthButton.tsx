@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import {
   ChevronDown,
   LogIn,
@@ -23,12 +22,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { LoginDialog } from "./LoginDialog";
 import type { UserRole } from "@/lib/types";
 
 export function AuthButton() {
   const { user, role, logout, setUserRole, loading } = useAuth();
-  const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false);
 
   if (loading) {
     return <Button variant="ghost" size="sm">Loading...</Button>;
@@ -36,13 +33,12 @@ export function AuthButton() {
 
   if (!user) {
     return (
-      <>
-        <Button onClick={() => setIsLoginDialogOpen(true)}>
+      <Button asChild>
+        <Link href="/login">
           <LogIn className="mr-2 h-4 w-4" />
-          Sign In
-        </Button>
-        <LoginDialog open={isLoginDialogOpen} onOpenChange={setIsLoginDialogOpen} />
-      </>
+          Login / Sign Up
+        </Link>
+      </Button>
     );
   }
 

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { FileText, Lightbulb } from 'lucide-react';
 
 import {
@@ -14,15 +14,15 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarInset,
-  SidebarFooter,
 } from '@/components/ui/sidebar';
 import RoleGuard from '@/components/RoleGuard';
 import { useAuth } from '@/components/auth/AuthContext';
 import { AuthButton } from '@/components/auth/AuthButton';
 
 export default function AdminDashboardLayout({ children }: { children: React.ReactNode }) {
-    const { loading } = useAuth();
+    const { loading, user } = useAuth();
     const pathname = usePathname();
+    const router = useRouter();
 
     if (loading) {
         return (
@@ -30,6 +30,11 @@ export default function AdminDashboardLayout({ children }: { children: React.Rea
                 <div className="text-lg animate-pulse">Loading Dashboard...</div>
             </div>
         );
+    }
+    
+    if (!loading && !user) {
+        router.push('/login');
+        return null;
     }
   
   return (
