@@ -1,179 +1,137 @@
 /**
- * @file Firebase Security Rules for Firestore.
+ * @fileoverview Firestore Security Rules for the Suggestion Box application.
  *
- * @Core Philosophy: This ruleset prioritizes secure access control based on user roles and ownership,
- * with an emphasis on protecting user data and enforcing data integrity. It avoids complex
- * hierarchical authorization dependencies by denormalizing data where necessary.
+ * Core Philosophy:
+ * This ruleset prioritizes a secure, role-based access control model.
+ * Users have full ownership of their profiles, while admins and super admins have elevated privileges for managing suggestions and their statuses.
+ * Data access is structurally segregated to ensure that read access for suggestions is open to all, while write access is strictly controlled.
+ * Anonymous suggestions are permitted, but all writes are protected by an authorization check.
  *
- * @Data Structure:
- * - /users/{uid}: Stores user profile information, with the 'role' field used for authorization.
- * - /suggestions/{suggestionId}: Stores suggestions submitted by users, with 'authorUid' tracking ownership.
- * - /votes/{voteId}: Stores votes, linking suggestions and users.
- * - /user_votes/{uid}/suggestions/{suggestionId}:  A subcollection to track which suggestions a user has voted for.
+ * Data Structure:
+ * - /users/{uid}: Stores user profile information, with the user's role denormalized directly within the document for authorization.
+ * - /suggestions/{suggestionId}: Stores suggestions. The `authorUid` field tracks ownership.
+ * - /votes/{voteId}: Stores votes, linking suggestions to users.
+ * - /user_votes/{uid}/suggestions/{suggestionId}: Tracks user votes on suggestions.
  * - /comments/{commentId}: Stores comments on suggestions.
  *
- * @Key Security Decisions:
- * - User listing is disabled for privacy.
- * - Read access to /suggestions is public, but write access is restricted to authenticated users.
- * - Data validation is limited to authorization-critical fields to allow for flexible data shapes during prototyping.
- * - All write operations require authentication.
- *
- * @Denormalization for Authorization: The 'role' field is denormalized into the /users/{uid} document
- * to enable efficient authorization checks without additional reads.
+ * Key Security Decisions:
+ * - User listing is denied to protect user privacy.
+ * - The `suggestions` collection is publicly readable but only modifiable by authorized users.
+ * - Strict role-based authorization is enforced for suggestion management.
+ * - Data validation is minimized in this prototyping phase, focusing on critical authorization fields.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Allows users to read and write their own profile data. Only the authenticated user can create their own profile.
+     * @description Checks if the request is authenticated.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * @description Checks if the authenticated user is the owner of the resource.
+     */
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    /**
+     * @description Checks if the authenticated user is an admin.
+     */
+    function isAdmin() {
+      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'ADMIN';
+    }
+
+    /**
+     * @description Checks if the authenticated user is a super admin.
+     */
+    function isSuperAdmin() {
+      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'SUPER_ADMIN';
+    }
+
+    /**
+     * @description Checks if the authenticated user is the owner of the resource and if the resource exists.
+     */
+    function isExistingOwner(userId) {
+      return isOwner(userId) && resource != null;
+    }
+
+    /**
+     * @description Enforces document ownership for writes.
      * @path /users/{uid}
-     * @allow (create) - Authenticated user can create their own profile.
-     *    - request.auth.uid: "user123"
-     *    - resource.data.uid: "user123"
-     * @allow (get, list, update, delete) - Authenticated user can read, update, and delete their own profile.
-     *    - request.auth.uid: "user123"
-     *    - resource.data.uid: "user123"
-     * @deny (create) - User attempts to create a profile with a mismatched uid.
-     *    - request.auth.uid: "user123"
-     *    - resource.data.uid: "user456"
-     * @deny (update, delete) - User attempts to update or delete another user's profile.
-     *    - request.auth.uid: "user123"
-     *    - resource.data.uid: "user456"
-     * @principle Enforces document ownership for user profiles.
+     * @allow (create) User with uid 'user123' can create their own profile.
+     * @deny (create) User with uid 'user123' cannot create a profile for 'user456'.
+     * @principle Enforces document ownership for writes.
      */
     match /users/{userId} {
-      function isOwner(userId) {
-        return request.auth.uid == userId;
-      }
       allow get: if isOwner(userId);
       allow list: if false;
-      allow create: if request.auth.uid == userId;
-      allow update: if isOwner(userId);
-      allow delete: if isOwner(userId);
+
+      allow create: if isOwner(userId) && request.resource.data.uid == userId;
+      allow update: if isExistingOwner(userId) && request.resource.data.uid == resource.data.uid;
+      allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Allows anyone to read suggestions, but restricts writes to authenticated users, where the authorUid must match the user's ID.
+     * @description Allows anyone to read suggestions, but restricts creation, updates, and deletion to authorized users (authors, admins, or super admins).
      * @path /suggestions/{suggestionId}
-     * @allow (get, list) - Anyone can read suggestions.
-     * @allow (create) - Authenticated user can create a suggestion with their UID as the authorUid.
-     *    - request.auth.uid: "user123"
-     *    - resource.data.authorUid: "user123"
-     * @allow (update, delete) - Authenticated user (the author) can update/delete their own suggestion.
-     *    - request.auth.uid: "user123"
-     *    - resource.data.authorUid: "user123"
-     * @deny (create) - User attempts to create a suggestion with a mismatched authorUid.
-     *    - request.auth.uid: "user123"
-     *    - resource.data.authorUid: "user456"
-     * @deny (update, delete) - User attempts to update or delete a suggestion they don't own.
-     *    - request.auth.uid: "user123"
-     *    - resource.data.authorUid: "user456"
-     * @principle Allows public reads with owner-only writes; enforces ownership via authorUid.
+     * @allow (get) Any user can read a suggestion.
+     * @allow (create) A user can create a suggestion with their UID as the authorUid.
+     * @allow (update) An admin can update the impactScore of a suggestion.
+     * @deny (update) A regular user cannot update a suggestion's title.
+     * @principle Open read access with restricted write access based on role and ownership.
      */
     match /suggestions/{suggestionId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-      function isOwner(authorUid) {
-        return request.auth.uid == authorUid;
-      }
-      function isValidSuggestionCreate() {
-        return request.auth.uid == request.resource.data.authorUid;
-      }
-      function isExistingOwner() {
-        return request.auth.uid == resource.data.authorUid;
-      }
       allow get: if true;
       allow list: if true;
-      allow create: if isSignedIn() && isValidSuggestionCreate();
-      allow update: if isSignedIn() && isExistingOwner();
-      allow delete: if isSignedIn() && isExistingOwner();
+
+      allow create: if isSignedIn() && request.resource.data.authorUid == request.auth.uid;
+      allow update: if (isAdmin() || isSuperAdmin()) && (request.resource.data.reviewerUid == request.auth.uid || request.resource.data.reviewerUid == resource.data.reviewerUid)
+      || (isSignedIn() && request.resource.data.authorUid == request.auth.uid && resource.data.authorUid == request.auth.uid);
+      allow delete: if (isAdmin() || isSuperAdmin());
     }
 
     /**
-     * @description Allows authenticated users to create votes, enforcing that the voterUid matches their UID.
+     * @description Allows authenticated users to create votes, but only if the suggestionId and voterUid match the document.
      * @path /votes/{voteId}
-     * @allow (create) - Authenticated user can create a vote with their UID as the voterUid.
-     *    - request.auth.uid: "user123"
-     *    - resource.data.voterUid: "user123"
-     * @allow (get) - Allows any user to read a vote
-     * @deny (create) - User attempts to create a vote with a mismatched voterUid.
-     *    - request.auth.uid: "user123"
-     *    - resource.data.voterUid: "user456"
-     * @deny (update, delete) - Only creation of vote documents is allowed
-     * @principle Enforces ownership via voterUid; restricts updates/deletes.
+     * @allow (create) A user can create a vote with their UID as the voterUid and a valid suggestionId.
+     * @deny (create) A user cannot create a vote with a mismatched voterUid.
+     * @principle Enforces document ownership and authentication for creating votes.
      */
     match /votes/{voteId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-      function isOwner(voterUid) {
-        return request.auth.uid == voterUid;
-      }
-      function isValidVoteCreate() {
-        return request.auth.uid == request.resource.data.voterUid;
-      }
-      allow get: if true;
+      allow get: if false;
       allow list: if false;
-      allow create: if isSignedIn() && isValidVoteCreate();
+      allow create: if isSignedIn() && request.resource.data.voterUid == request.auth.uid;
       allow update: if false;
       allow delete: if false;
     }
 
     /**
-     * @description Allows authenticated users to create a document in their user votes collection.
+     * @description Allows a user to create a document in their own user_votes collection to track which suggestions they have voted for.
      * @path /user_votes/{uid}/suggestions/{suggestionId}
-     * @allow (create) - Authenticated user can create a vote suggestion reference, where the uid matches the request and the document doesn't already exist.
-     *    - request.auth.uid: "user123"
-     *    - uid: "user123"
-     * @allow (get, list) - Authenticated user can read their own vote suggestions.
-     *    - request.auth.uid: "user123"
-     *    - uid: "user123"
-     * @deny (create) - User attempts to create a vote suggestion reference for another user.
-     *    - request.auth.uid: "user123"
-     *    - uid: "user456"
-     * @deny (update, delete) - Updating or deleting vote suggestion reference documents is forbidden.
-     * @principle Enforces ownership in user subcollections; limits data manipulation to creation.
+     * @allow (create) A user can create a vote record in their user_votes collection.
+     * @deny (create) A user cannot create a vote record in another user's collection.
      */
     match /user_votes/{userId}/suggestions/{suggestionId} {
-        function isOwner(userId) {
-            return request.auth.uid == userId;
-        }
-
         allow get: if isOwner(userId);
         allow list: if isOwner(userId);
-        allow create: if request.auth.uid == userId;
+        allow create: if isOwner(userId);
         allow update: if false;
         allow delete: if false;
     }
 
     /**
-     * @description Allows authenticated users to create comments on suggestions, linking the comment to their user ID.
+     * @description Allows authenticated users to create comments. No update or delete.
      * @path /comments/{commentId}
-     * @allow (create) - Authenticated user can create a comment with their UID as the authorUid.
-     *    - request.auth.uid: "user123"
-     *    - resource.data.authorUid: "user123"
-     * @allow (get, list) - Anyone can read and list comments.
-     * @deny (create) - User attempts to create a comment with a mismatched authorUid.
-     *    - request.auth.uid: "user123"
-     *    - resource.data.authorUid: "user456"
-     * @deny (update, delete) - Updating or deleting comments is forbidden.
-     * @principle Enforces ownership on creation; allows public reads; restricts updates/deletes.
+     * @allow (create) A user can create a comment.
      */
     match /comments/{commentId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-      function isOwner(authorUid) {
-        return request.auth.uid == authorUid;
-      }
-      function isValidCommentCreate() {
-        return request.auth.uid == request.resource.data.authorUid;
-      }
       allow get: if true;
       allow list: if true;
-      allow create: if isSignedIn() && isValidCommentCreate();
+      allow create: if isSignedIn();
       allow update: if false;
       allow delete: if false;
     }

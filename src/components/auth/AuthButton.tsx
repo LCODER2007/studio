@@ -6,8 +6,6 @@ import {
   LogOut,
   Shield,
   User,
-  UserCheck,
-  UserCog,
 } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/components/auth/AuthContext";
@@ -16,16 +14,14 @@ import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import type { UserRole } from "@/lib/types";
 
 export function AuthButton() {
-  const { user, role, logout, setUserRole, loading } = useAuth();
+  const { user, role, logout, loading } = useAuth();
 
   if (loading) {
     return <Button variant="ghost" size="sm">Loading...</Button>;
@@ -41,10 +37,6 @@ export function AuthButton() {
       </Button>
     );
   }
-
-  const handleRoleChange = (newRole: UserRole) => {
-    setUserRole(newRole);
-  };
 
   return (
     <DropdownMenu>
@@ -74,22 +66,12 @@ export function AuthButton() {
                 </Link>
             </DropdownMenuItem>
         )}
-        <DropdownMenuSeparator />
-        <DropdownMenuGroup>
-          <DropdownMenuLabel>Switch Role (Demo)</DropdownMenuLabel>
-          <DropdownMenuItem onClick={() => handleRoleChange("STUDENT")} disabled={role === 'STUDENT'}>
-            <User className="mr-2 h-4 w-4" />
-            <span>Student</span>
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => handleRoleChange("ADMIN")} disabled={role === 'ADMIN'}>
-            <UserCheck className="mr-2 h-4 w-4" />
-            <span>Admin</span>
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => handleRoleChange("SUPER_ADMIN")} disabled={role === 'SUPER_ADMIN'}>
-            <UserCog className="mr-2 h-4 w-4" />
-            <span>Super Admin</span>
-          </DropdownMenuItem>
-        </DropdownMenuGroup>
+         <DropdownMenuItem asChild>
+            <Link href="/">
+                <User className="mr-2 h-4 w-4" />
+                <span>Home</span>
+            </Link>
+        </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={logout}>
           <LogOut className="mr-2 h-4 w-4" />

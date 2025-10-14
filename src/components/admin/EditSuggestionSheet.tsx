@@ -34,6 +34,7 @@ import * as z from "zod";
 import { Suggestion, SuggestionStatuses } from "@/lib/types";
 import { useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "../auth/AuthContext";
 
 interface EditSuggestionSheetProps {
   suggestion: Suggestion | null;
@@ -53,6 +54,12 @@ type FormValues = z.infer<typeof formSchema>;
 
 export function EditSuggestionSheet({ suggestion, open, onOpenChange, onUpdate }: EditSuggestionSheetProps) {
     const { toast } = useToast();
+    const { role } = useAuth();
+
+    const availableStatuses = role === 'SUPER_ADMIN' 
+        ? SuggestionStatuses 
+        : SuggestionStatuses.filter(s => s !== 'IMPLEMENTED');
+
     const form = useForm<FormValues>({
         resolver: zodResolver(formSchema),
     });
@@ -112,7 +119,7 @@ export function EditSuggestionSheet({ suggestion, open, onOpenChange, onUpdate }
                                             <SelectTrigger><SelectValue /></SelectTrigger>
                                         </FormControl>
                                         <SelectContent>
-                                            {SuggestionStatuses.map(status => (
+                                            {availableStatuses.map(status => (
                                                 <SelectItem key={status} value={status} className="capitalize">{status.replace(/_/g, " ").toLowerCase()}</SelectItem>
                                             ))}
                                         </SelectContent>
