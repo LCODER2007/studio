@@ -5,13 +5,12 @@ import { useMemo } from 'react';
 import { useParams } from 'next/navigation';
 import { useDoc, useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import type { Suggestion, Comment as CommentType } from '@/lib/types';
-import { doc, collection, query, orderBy } from 'firebase/firestore';
+import { doc, collection, query, orderBy, where, serverTimestamp } from 'firebase/firestore';
 import Header from '@/components/layout/Header';
 import SuggestionDetail from '@/components/suggestions/SuggestionDetail';
 import CommentList from '@/components/comments/CommentList';
 import AddCommentForm from '@/components/comments/AddCommentForm';
 import { addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
-import { serverTimestamp } from 'firebase/firestore';
 import { useAuth } from '@/components/auth/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 
@@ -30,13 +29,9 @@ export default function SuggestionPage() {
 
     const commentsQuery = useMemoFirebase(() => {
         if (!firestore || !suggestionId) return null;
-        return query(collection(firestore, 'comments'), orderBy('timestamp', 'asc'));
+        return query(collection(firestore, 'comments'), where('suggestionId', '==', suggestionId), orderBy('timestamp', 'asc'));
     }, [firestore, suggestionId]);
     const { data: comments, isLoading: isLoadingComments } = useCollection<CommentType>(commentsQuery);
-
-    const filteredComments = useMemo(() => {
-        return comments?.filter(comment => comment.suggestionId === suggestionId) || [];
-    }, [comments, suggestionId]);
 
     const handleAddComment = (commentBody: string) => {
         if (!firestore || !user || !suggestionId) {
@@ -49,8 +44,7 @@ export default function SuggestionPage() {
         }
 
         const commentRef = doc(collection(firestore, 'comments'));
-        const newComment: CommentType = {
-            commentId: commentRef.id,
+        const newComment: Omit<CommentType, 'commentId'> = {
             suggestionId: suggestionId,
             authorUid: user.uid,
             authorDisplayName: user.displayName || 'Anonymous',
@@ -59,7 +53,7 @@ export default function SuggestionPage() {
             timestamp: serverTimestamp(),
         };
 
-        addDocumentNonBlocking(commentRef, newComment);
+        addDocumentNonBlocking(commentRef, { ...newComment, commentId: commentRef.id });
         toast({
             title: "Comment Added!",
             description: "Your comment has been posted.",
@@ -99,9 +93,9 @@ export default function SuggestionPage() {
             <main className="flex-1 container mx-auto px-4 py-8 max-w-4xl">
                 <SuggestionDetail suggestion={suggestion} />
                 <div className="mt-8">
-                    <h2 className="text-2xl font-bold mb-4">Comments ({filteredComments.length})</h2>
+                    <h2 className="text-2xl font-bold mb-4">Comments ({comments?.length || 0})</h2>
                     <AddCommentForm onSubmit={handleAddComment} />
-                    <CommentList comments={filteredComments} />
+                    <CommentList comments={comments || []} />
                 </div>
             </main>
         </div>

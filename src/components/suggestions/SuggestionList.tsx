@@ -54,7 +54,7 @@ export default function SuggestionList() {
   const handleUpvote = useCallback((suggestionId: string) => {
     if (!firestore || !user) return;
     const voteRef = doc(collection(firestore, 'votes'));
-    addDocumentNonBlocking(collection(firestore, 'votes'), {
+    addDocumentNonBlocking(voteRef, {
         voteId: voteRef.id,
         suggestionId,
         voterUid: user.uid,
