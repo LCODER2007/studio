@@ -68,7 +68,13 @@ export default function AdminSuggestionTable({ suggestions, onEdit }: AdminSugge
     {
         accessorKey: "submissionTimestamp",
         header: ({ column }) => <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>Date Submitted</Button>,
-        cell: ({ row }) => <div>{format(new Date(row.getValue("submissionTimestamp")), "PPP")}</div>,
+        cell: ({ row }) => {
+          const timestamp = row.getValue("submissionTimestamp");
+          if (!timestamp) return null;
+          // Firestore Timestamps can be objects with toDate(), or JS Dates from mock data
+          const date = timestamp instanceof Date ? timestamp : (timestamp as any).toDate();
+          return <div>{format(date, "PPP")}</div>
+        },
     },
     {
         accessorKey: "upvotesCount",
@@ -80,7 +86,7 @@ export default function AdminSuggestionTable({ suggestions, onEdit }: AdminSugge
         header: "Avg. Score",
         cell: ({ row }) => {
             const { impactScore, feasibilityRating, costEffectivenessRating } = row.original;
-            if (impactScore === 0) return <div className="text-center text-muted-foreground">N/A</div>;
+            if (!impactScore || impactScore === 0) return <div className="text-center text-muted-foreground">N/A</div>;
             const avg = ((impactScore + feasibilityRating + costEffectivenessRating) / 3).toFixed(1);
             return <div className="text-center font-mono">{avg}</div>
         }

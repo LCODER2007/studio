@@ -23,7 +23,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 interface SuggestionCardProps {
   suggestion: Suggestion;
   onUpvote: (suggestionId: string) => void;
-  // This would be tracked per user in a real app
   hasUpvoted: boolean;
 }
 
@@ -37,17 +36,19 @@ const statusColorMap: Record<Suggestion["status"], string> = {
 
 export default function SuggestionCard({ suggestion, onUpvote, hasUpvoted }: SuggestionCardProps) {
   const { user } = useAuth();
-  const [isUpvoted, setIsUpvoted] = useState(hasUpvoted);
-
+  
   const handleUpvoteClick = () => {
-    if (user) {
+    if (user && !hasUpvoted) {
       onUpvote(suggestion.suggestionId);
-      setIsUpvoted(!isUpvoted);
     }
-    // In a real app, you might want to prompt login if not authenticated
   };
 
   const showUpvotes = suggestion.status === 'SHORTLISTED' || suggestion.status === 'IMPLEMENTED';
+  
+  // Firestore Timestamps can be objects with toDate(), or JS Dates from mock data
+  const submissionDate = suggestion.submissionTimestamp instanceof Date 
+    ? suggestion.submissionTimestamp 
+    : (suggestion.submissionTimestamp as any).toDate();
 
   return (
     <Card className="flex flex-col h-full transition-all hover:shadow-md">
@@ -74,12 +75,12 @@ export default function SuggestionCard({ suggestion, onUpvote, hasUpvoted }: Sug
           <div className="flex items-center gap-2 text-xs text-muted-foreground pt-2">
             <Avatar className="h-5 w-5">
               <AvatarImage src={suggestion.authorPhotoURL ?? ""} />
-              <AvatarFallback>{suggestion.authorDisplayName.charAt(0)}</AvatarFallback>
+              <AvatarFallback>{suggestion.authorDisplayName?.charAt(0)}</AvatarFallback>
             </Avatar>
             <span>{suggestion.authorDisplayName}</span>
             <span>&bull;</span>
             <span>
-              {formatDistanceToNow(suggestion.submissionTimestamp, { addSuffix: true })}
+              {formatDistanceToNow(submissionDate, { addSuffix: true })}
             </span>
           </div>
         </CardDescription>
@@ -91,18 +92,18 @@ export default function SuggestionCard({ suggestion, onUpvote, hasUpvoted }: Sug
       </CardContent>
       <CardFooter className="flex justify-between items-center">
         <Button
-          variant={isUpvoted ? "default" : "outline"}
+          variant={hasUpvoted ? "default" : "outline"}
           size="sm"
           onClick={handleUpvoteClick}
-          disabled={!user}
-          aria-pressed={isUpvoted}
+          disabled={!user || hasUpvoted}
+          aria-pressed={hasUpvoted}
           className="group transition-all duration-300"
         >
-          <ArrowUp className={cn("mr-2 h-4 w-4", isUpvoted ? "transform scale-125" : "group-hover:animate-bounce")} />
+          <ArrowUp className={cn("mr-2 h-4 w-4", hasUpvoted ? "transform scale-125" : "group-hover:animate-bounce")} />
           <span>Upvote</span>
           {showUpvotes && (
               <span className="ml-2 tabular-nums">
-                {suggestion.upvotesCount + (isUpvoted && !hasUpvoted ? 1 : !isUpvoted && hasUpvoted ? -1 : 0)}
+                {suggestion.upvotesCount}
               </span>
           )}
         </Button>

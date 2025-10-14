@@ -1,7 +1,5 @@
 "use client";
 
-import { useAuth } from "@/components/auth/AuthContext";
-import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -9,8 +7,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import type { UserRole } from "@/lib/types";
+import { Button } from "@/components/ui/button";
 import { LogIn } from "lucide-react";
+import { initiateEmailSignIn } from "@/firebase/non-blocking-login";
+import { useAuth as useFirebaseAuth } from "@/firebase";
 
 interface LoginDialogProps {
   open: boolean;
@@ -18,10 +18,25 @@ interface LoginDialogProps {
 }
 
 export function LoginDialog({ open, onOpenChange }: LoginDialogProps) {
-  const { login } = useAuth();
+  const auth = useFirebaseAuth();
 
-  const handleLogin = (role: UserRole) => {
-    login(role);
+  const handleLogin = (role: 'STUDENT' | 'ADMIN' | 'SUPER_ADMIN') => {
+    let email, password;
+    switch(role) {
+      case 'STUDENT':
+        email = 'student@unilag.edu';
+        password = 'password';
+        break;
+      case 'ADMIN':
+        email = 'sees-admin@unilag.edu';
+        password = 'password';
+        break;
+      case 'SUPER_ADMIN':
+        email = 'super@unilag.edu';
+        password = 'password';
+        break;
+    }
+    initiateEmailSignIn(auth, email, password);
     onOpenChange(false);
   };
 

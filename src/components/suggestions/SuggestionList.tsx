@@ -1,29 +1,44 @@
 "use client";
 
 import { useState, useMemo, useCallback } from "react";
-import { mockSuggestions } from "@/lib/placeholder-data";
 import type { Suggestion, SuggestionCategory, SuggestionStatus } from "@/lib/types";
 import SuggestionCard from "./SuggestionCard";
 import SuggestionFilters from "./SuggestionFilters";
 import { SubmitSuggestionDialog } from "./SubmitSuggestionDialog";
 import { useAuth } from "../auth/AuthContext";
 import { AnimatePresence, motion } from "framer-motion";
+import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
+import { addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
+import { collection, doc, serverTimestamp } from "firebase/firestore";
 
 type SortOption = "upvotesCount" | "submissionTimestamp";
 
 export default function SuggestionList() {
   const { user } = useAuth();
-  const [suggestions, setSuggestions] = useState<Suggestion[]>(mockSuggestions);
+  const firestore = useFirestore();
   const [isSubmitDialogOpen, setIsSubmitDialogOpen] = useState(false);
   const [filters, setFilters] = useState<{ category: string; status: string }>({ category: "all", status: "all" });
   const [sortBy, setSortBy] = useState<SortOption>("submissionTimestamp");
-  const [upvotedIds, setUpvotedIds] = useState<Set<string>>(new Set());
+  
+  const suggestionsQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return collection(firestore, 'suggestions');
+  }, [firestore]);
+
+  const { data: suggestions, isLoading } = useCollection<Suggestion>(suggestionsQuery);
+
+  const votesQuery = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return collection(firestore, 'votes');
+  }, [firestore, user]);
+  const { data: votes } = useCollection(votesQuery);
+  const upvotedIds = useMemo(() => new Set(votes?.filter(v => v.voterUid === user?.uid).map(v => v.suggestionId) || []), [votes, user]);
+
 
   const handleOpenSubmitDialog = () => {
     if (user) {
       setIsSubmitDialogOpen(true);
     } else {
-      // In a real app, you'd trigger a login modal here
       alert("Please sign in to submit a suggestion.");
     }
   };
@@ -37,28 +52,31 @@ export default function SuggestionList() {
   }, []);
 
   const handleUpvote = useCallback((suggestionId: string) => {
-    setUpvotedIds(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(suggestionId)) {
-        newSet.delete(suggestionId);
-      } else {
-        newSet.add(suggestionId);
-      }
-      return newSet;
+    if (!firestore || !user) return;
+    const voteRef = doc(collection(firestore, 'votes'));
+    addDocumentNonBlocking(collection(firestore, 'votes'), {
+        voteId: voteRef.id,
+        suggestionId,
+        voterUid: user.uid,
+        timestamp: serverTimestamp(),
     });
-  }, []);
+  }, [firestore, user]);
 
   const handleSubmitSuggestion = (newSuggestion: Omit<Suggestion, 'suggestionId' | 'upvotesCount' | 'commentsCount'>) => {
+    if (!firestore) return;
+    const suggestionRef = doc(collection(firestore, 'suggestions'));
     const suggestionWithId: Suggestion = {
       ...newSuggestion,
-      suggestionId: crypto.randomUUID(),
+      suggestionId: suggestionRef.id,
       upvotesCount: 0,
       commentsCount: 0,
+      submissionTimestamp: new Date(),
     };
-    setSuggestions(prev => [suggestionWithId, ...prev]);
+    addDocumentNonBlocking(collection(firestore, 'suggestions'), suggestionWithId);
   };
 
   const filteredAndSortedSuggestions = useMemo(() => {
+    if (!suggestions) return [];
     return suggestions
       .filter(s => filters.category === 'all' || s.category === filters.category)
       .filter(s => filters.status === 'all' || s.status === filters.status)
@@ -66,9 +84,19 @@ export default function SuggestionList() {
         if (sortBy === 'upvotesCount') {
           return b.upvotesCount - a.upvotesCount;
         }
-        return b.submissionTimestamp.getTime() - a.submissionTimestamp.getTime();
+        const dateA = a.submissionTimestamp instanceof Date ? a.submissionTimestamp.getTime() : a.submissionTimestamp.toMillis();
+        const dateB = b.submissionTimestamp instanceof Date ? b.submissionTimestamp.getTime() : b.submissionTimestamp.toMillis();
+        return dateB - dateA;
       });
   }, [suggestions, filters, sortBy]);
+  
+  if (isLoading) {
+    return (
+        <div className="text-center py-20">
+            <h2 className="text-2xl font-semibold animate-pulse">Loading Suggestions...</h2>
+        </div>
+    );
+  }
 
   return (
     <>

@@ -1,13 +1,20 @@
 "use client";
 
 import { useState } from 'react';
-import { mockSuggestions } from '@/lib/placeholder-data';
 import type { Suggestion } from '@/lib/types';
 import AdminSuggestionTable from './AdminSuggestionTable';
 import { EditSuggestionSheet } from './EditSuggestionSheet';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { collection, doc } from 'firebase/firestore';
+import { updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 
 export default function AdminDashboard() {
-  const [suggestions, setSuggestions] = useState<Suggestion[]>(mockSuggestions);
+  const firestore = useFirestore();
+  const suggestionsQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return collection(firestore, 'suggestions');
+  }, [firestore]);
+  const { data: suggestions, isLoading } = useCollection<Suggestion>(suggestionsQuery);
   const [editingSuggestion, setEditingSuggestion] = useState<Suggestion | null>(null);
 
   const handleEdit = (suggestion: Suggestion) => {
@@ -15,18 +22,24 @@ export default function AdminDashboard() {
   };
 
   const handleUpdateSuggestion = (updatedSuggestion: Suggestion) => {
-    setSuggestions(prev =>
-      prev.map(s => (s.suggestionId === updatedSuggestion.suggestionId ? updatedSuggestion : s))
-    );
-    // Here you would also call your backend to persist the changes.
-    // A Cloud Function would then trigger to send notifications if the status changed to 'SHORTLISTED' or 'IMPLEMENTED'.
+    if (!firestore) return;
+    const suggestionRef = doc(firestore, 'suggestions', updatedSuggestion.suggestionId);
+    updateDocumentNonBlocking(suggestionRef, updatedSuggestion);
     setEditingSuggestion(null);
   };
   
+  if (isLoading) {
+    return (
+        <div className="flex items-center justify-center h-screen">
+            <div className="text-lg animate-pulse">Loading Suggestions...</div>
+        </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <AdminSuggestionTable
-        suggestions={suggestions}
+        suggestions={suggestions || []}
         onEdit={handleEdit}
       />
       <EditSuggestionSheet
