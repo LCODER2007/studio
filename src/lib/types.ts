@@ -41,7 +41,17 @@ export interface Suggestion {
   feasibilityRating: number; // 1-5
   costEffectivenessRating: number; // 1-5
   reviewerUid?: string;
-  submissionTimestamp: Date;
+  submissionTimestamp: any; // Can be Date or Firebase Timestamp
   publicFeedback?: string;
   commentsCount: number;
+}
+
+export interface Comment {
+    commentId: string;
+    suggestionId: string;
+    authorUid: string;
+    authorDisplayName: string;
+    authorPhotoURL?: string | null;
+    body: string;
+    timestamp: any; // Can be Date or Firebase Timestamp
 }

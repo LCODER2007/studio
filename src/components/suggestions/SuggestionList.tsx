@@ -1,14 +1,14 @@
 "use client";
 
 import { useState, useMemo, useCallback } from "react";
-import type { Suggestion, SuggestionCategory, SuggestionStatus } from "@/lib/types";
+import type { Suggestion } from "@/lib/types";
 import SuggestionCard from "./SuggestionCard";
 import SuggestionFilters from "./SuggestionFilters";
 import { SubmitSuggestionDialog } from "./SubmitSuggestionDialog";
 import { useAuth } from "../auth/AuthContext";
 import { AnimatePresence, motion } from "framer-motion";
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
-import { addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
+import { addDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { collection, doc, serverTimestamp } from "firebase/firestore";
 
 type SortOption = "upvotesCount" | "submissionTimestamp";
@@ -65,14 +65,14 @@ export default function SuggestionList() {
   const handleSubmitSuggestion = (newSuggestion: Omit<Suggestion, 'suggestionId' | 'upvotesCount' | 'commentsCount'>) => {
     if (!firestore) return;
     const suggestionRef = doc(collection(firestore, 'suggestions'));
-    const suggestionWithId: Suggestion = {
+    const fullSuggestion: Suggestion = {
       ...newSuggestion,
       suggestionId: suggestionRef.id,
       upvotesCount: 0,
       commentsCount: 0,
-      submissionTimestamp: new Date(),
+      submissionTimestamp: serverTimestamp(),
     };
-    addDocumentNonBlocking(collection(firestore, 'suggestions'), suggestionWithId);
+    addDocumentNonBlocking(suggestionRef, fullSuggestion);
   };
 
   const filteredAndSortedSuggestions = useMemo(() => {
@@ -84,8 +84,8 @@ export default function SuggestionList() {
         if (sortBy === 'upvotesCount') {
           return b.upvotesCount - a.upvotesCount;
         }
-        const dateA = a.submissionTimestamp instanceof Date ? a.submissionTimestamp.getTime() : a.submissionTimestamp.toMillis();
-        const dateB = b.submissionTimestamp instanceof Date ? b.submissionTimestamp.getTime() : b.submissionTimestamp.toMillis();
+        const dateA = a.submissionTimestamp?.toMillis() || 0;
+        const dateB = b.submissionTimestamp?.toMillis() || 0;
         return dateB - dateA;
       });
   }, [suggestions, filters, sortBy]);
@@ -142,5 +142,3 @@ export default function SuggestionList() {
     </>
   );
 }
-
-    
