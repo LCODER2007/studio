@@ -17,13 +17,14 @@ export default function SuggestionPage() {
     const { id } = useParams();
     const suggestionId = Array.isArray(id) ? id[0] : id;
     const firestore = useFirestore();
-    const { user } = useAuth();
+    const { user, loading: userLoading } = useAuth();
     const { toast } = useToast();
 
     const suggestionRef = useMemoFirebase(() => {
         if (!firestore || !suggestionId) return null;
         return doc(firestore, 'suggestions', suggestionId);
     }, [firestore, suggestionId]);
+    
     const { data: suggestion, isLoading: isLoadingSuggestion } = useDoc<Suggestion>(suggestionRef);
 
     const commentsQuery = useMemoFirebase(() => {
@@ -31,6 +32,7 @@ export default function SuggestionPage() {
         // This query fetches comments specifically for the current suggestion, ordered by time.
         return query(collection(firestore, 'comments'), where('suggestionId', '==', suggestionId), orderBy('timestamp', 'asc'));
     }, [firestore, suggestionId]);
+    
     const { data: comments, isLoading: isLoadingComments } = useCollection<CommentType>(commentsQuery);
 
     const handleAddComment = (commentBody: string) => {
@@ -44,17 +46,20 @@ export default function SuggestionPage() {
         }
 
         const commentRef = doc(collection(firestore, 'comments'));
-        const newComment: Omit<CommentType, 'commentId' | 'timestamp'> & { timestamp: any } = {
+        
+        // Construct the new comment object
+        const newComment = {
             suggestionId: suggestionId,
             authorUid: user.uid,
-            authorDisplayName: user.displayName || 'Anonymous',
-            authorPhotoURL: user.photoURL,
+            authorDisplayName: user.displayName || 'Anonymous User',
+            authorPhotoURL: user.photoURL || null,
             body: commentBody,
-            timestamp: serverTimestamp(), // Use server timestamp for consistency
+            timestamp: serverTimestamp(),
+            commentId: commentRef.id, // Add the generated ID to the document data
         };
 
-        // The 'commentId' is now added right before the document is created.
-        addDocumentNonBlocking(commentRef, { ...newComment, commentId: commentRef.id });
+        // Use the non-blocking function to add the document
+        addDocumentNonBlocking(commentRef, newComment);
 
         toast({
             title: "Comment Added!",
@@ -62,13 +67,17 @@ export default function SuggestionPage() {
         });
     };
 
-    if (isLoadingSuggestion || isLoadingComments) {
+    const isLoading = isLoadingSuggestion || isLoadingComments || userLoading;
+
+    if (isLoading) {
         return (
             <div className="flex flex-col min-h-screen bg-background">
                 <Header />
                 <main className="flex-1 container mx-auto px-4 py-8">
-                    <div className="text-center">
-                        <p className="text-lg animate-pulse">Loading suggestion...</p>
+                    <div className="space-y-4">
+                      <div className="w-full h-40 bg-muted rounded-lg animate-pulse"></div>
+                      <div className="w-full h-20 bg-muted rounded-lg animate-pulse"></div>
+                      <div className="w-full h-20 bg-muted rounded-lg animate-pulse"></div>
                     </div>
                 </main>
             </div>
@@ -80,9 +89,9 @@ export default function SuggestionPage() {
             <div className="flex flex-col min-h-screen bg-background">
                 <Header />
                 <main className="flex-1 container mx-auto px-4 py-8">
-                    <div className="text-center">
-                        <h1 className="text-2xl font-bold">Suggestion not found</h1>
-                        <p className="text-muted-foreground">The suggestion you are looking for does not exist or may have been deleted.</p>
+                    <div className="text-center py-20 border-2 border-dashed rounded-lg">
+                        <h1 className="text-2xl font-bold text-muted-foreground">Suggestion Not Found</h1>
+                        <p className="text-muted-foreground mt-2">The suggestion you are looking for does not exist or may have been deleted.</p>
                     </div>
                 </main>
             </div>
@@ -94,7 +103,7 @@ export default function SuggestionPage() {
             <Header />
             <main className="flex-1 container mx-auto px-4 py-8 max-w-4xl">
                 <SuggestionDetail suggestion={suggestion} />
-                <div className="mt-8">
+                <div className="mt-12">
                     <h2 className="text-2xl font-bold mb-4">Comments ({comments?.length || 0})</h2>
                     <AddCommentForm onSubmit={handleAddComment} />
                     <CommentList comments={comments || []} />

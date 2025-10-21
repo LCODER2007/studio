@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import type { UserProfile, UserRole } from '@/lib/types';
 import { useUser, useAuth as useFirebaseAuth } from '@/firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, DocumentReference } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
 import { User } from 'firebase/auth';
 
@@ -23,12 +23,13 @@ async function getUserProfile(db: any, user: User): Promise<UserProfile> {
   if (userDoc.exists()) {
     return userDoc.data() as UserProfile;
   } else {
+    // This is a new user, create their profile document
     const newUserProfile: UserProfile = {
       uid: user.uid,
       email: user.email,
       displayName: user.displayName,
       photoURL: user.photoURL,
-      role: 'STUDENT', // Default role
+      role: 'STUDENT', // Default role for new sign-ups
     };
     await setDoc(userDocRef, newUserProfile);
     return newUserProfile;
@@ -43,18 +44,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const handleAuthChange = async () => {
-      if (firebaseUser) {
+    // This function will run when the firebaseUser object changes.
+    const handleAuthChange = async (user: User | null) => {
+      if (user) {
+        // User is signed in. Fetch or create their profile.
         setLoading(true);
-        const profile = await getUserProfile(db, firebaseUser);
+        const profile = await getUserProfile(db, user);
         setUserProfile(profile);
         setLoading(false);
       } else {
+        // User is signed out.
         setUserProfile(null);
-        setLoading(isUserLoading);
+        // We consider loading to be finished when we know there's no user.
+        setLoading(false); 
       }
     };
-    handleAuthChange();
+
+    // isUserLoading is true initially, then becomes false once Firebase Auth has checked.
+    // We only want to run our logic *after* this check is complete.
+    if (!isUserLoading) {
+      handleAuthChange(firebaseUser);
+    }
   }, [firebaseUser, isUserLoading, db]);
 
   const logout = useCallback(() => {
@@ -62,11 +72,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [auth]);
 
   const setUserRole = useCallback(async (role: UserRole) => {
-    if (userProfile) {
+    if (userProfile && db) {
       setLoading(true);
       const userDocRef = doc(db, 'users', userProfile.uid);
       const updatedProfile = { ...userProfile, role };
-      await setDoc(userDocRef, updatedProfile);
+      await setDoc(userDocRef, updatedProfile, { merge: true });
       setUserProfile(updatedProfile);
       setLoading(false);
     }
@@ -75,7 +85,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const value = {
     user: userProfile,
     role: userProfile?.role ?? null,
-    loading: loading,
+    // The loading state should reflect both the initial auth check and subsequent profile fetching.
+    loading: loading || isUserLoading,
     logout,
     setUserRole,
   };
