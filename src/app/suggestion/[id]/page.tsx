@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useMemo } from 'react';
@@ -12,6 +13,7 @@ import AddCommentForm from '@/components/comments/AddCommentForm';
 import { addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { useAuth } from '@/components/auth/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import Link from 'next/link';
 
 export default function SuggestionPage() {
     const { id } = useParams();
@@ -28,10 +30,11 @@ export default function SuggestionPage() {
     const { data: suggestion, isLoading: isLoadingSuggestion } = useDoc<Suggestion>(suggestionRef);
 
     const commentsQuery = useMemoFirebase(() => {
-        if (!firestore || !suggestionId) return null;
+        // Only fetch comments if the user is logged in
+        if (!firestore || !suggestionId || !user) return null;
         // This query fetches comments specifically for the current suggestion, ordered by time.
         return query(collection(firestore, 'comments'), where('suggestionId', '==', suggestionId), orderBy('timestamp', 'asc'));
-    }, [firestore, suggestionId]);
+    }, [firestore, suggestionId, user]);
     
     const { data: comments, isLoading: isLoadingComments } = useCollection<CommentType>(commentsQuery);
 
@@ -67,7 +70,7 @@ export default function SuggestionPage() {
         });
     };
 
-    const isLoading = isLoadingSuggestion || isLoadingComments || userLoading;
+    const isLoading = isLoadingSuggestion || userLoading;
 
     if (isLoading) {
         return (
@@ -105,8 +108,22 @@ export default function SuggestionPage() {
                 <SuggestionDetail suggestion={suggestion} />
                 <div className="mt-12">
                     <h2 className="text-2xl font-bold mb-4">Comments ({comments?.length || 0})</h2>
-                    <AddCommentForm onSubmit={handleAddComment} />
-                    <CommentList comments={comments || []} />
+                    {user ? (
+                        <>
+                            <AddCommentForm onSubmit={handleAddComment} />
+                            {isLoadingComments ? (
+                                <p className="mt-4 text-muted-foreground">Loading comments...</p>
+                            ) : (
+                                <CommentList comments={comments || []} />
+                            )}
+                        </>
+                    ) : (
+                        <div className="mt-6 p-6 border rounded-lg text-center bg-muted">
+                            <p className="text-muted-foreground">
+                                <Link href="/login" className="text-primary font-semibold hover:underline">Sign in</Link> to view and post comments.
+                            </p>
+                        </div>
+                    )}
                 </div>
             </main>
         </div>
