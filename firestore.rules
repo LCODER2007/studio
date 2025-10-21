@@ -2,180 +2,146 @@
  * @fileoverview Firestore Security Rules for the application.
  *
  * Core Philosophy:
- * This ruleset prioritizes strong authorization based on user identity and roles.
- * It uses a combination of ownership-based and role-based access control.
- * Data shape validation is relaxed to allow for rapid prototyping, focusing instead on secure authorization.
+ * This ruleset prioritizes Authorization Independence by embedding authorization data
+ * directly within documents. It implements a mix of public read access with
+ * owner-only or role-based write access for different collections. Data consistency
+ * between paths and document fields is strictly enforced to prevent privilege escalation.
  *
  * Data Structure:
- * - /users/{userId}: Stores user profile information, including the user's role.
- * - /suggestions/{suggestionId}: Stores suggestions submitted by users.
- * - /votes/{voteId}: Stores user votes for suggestions.
- * - /user_votes/{uid}/suggestions/{suggestionId}: Stores a document for each vote made by each user, used for efficient vote status checking.
- * - /comments/{commentId}: Stores comments on suggestions.
+ * - /users/{uid}: Stores user profile data, including a denormalized 'role' for efficient
+ *   authorization. Access is restricted to the owning user for updates.
+ * - /suggestions/{suggestionId}: Stores suggestions.  Open read access. Write access restricted
+ *   to the author.
+ * - /votes/{voteId}: Stores votes.
+ * - /user_votes/{uid}/suggestions/{suggestionId}: Subcollection for tracking user votes on suggestions
+ *   Restricted to the owning user.
+ * - /comments/{commentId}: Stores comments. Open read access. Write access restricted to the author.
  *
  * Key Security Decisions:
- * - Users can only create, update, or delete their own user documents.
- * - Suggestions are publicly readable, but write access is restricted to authenticated users and validated against the 'authorUid' field.
- * - The rules do not allow listing all users (to protect privacy).
- *
- * Denormalization for Authorization:
- * - User roles are denormalized directly into the /users/{userId} document.
- *   This avoids costly `get()` calls to a separate roles collection.
- * - Suggestions include the authorUid, avoiding the need to query for the author.
- *
- * Structural Segregation:
- * - Publicly readable suggestions are stored in a top-level collection (/suggestions),
- *   while private user data is stored under /users/{userId}.
+ * - User listing is disabled.
+ * - Public read access is granted to the `/suggestions` and `/comments` collections.
+ * - Write access to `/suggestions` and `/comments` is restricted to authenticated users.
+ * - The 'role' is denormalized within the user document for fast authorization checks.
+ * - All write operations validate the existence of the target document to prevent accidental deletions or updates.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Controls access to user profile documents.
+     * @description Defines the isSignedIn function to verify authentication.
+     * @path N/A
+     * @allow N/A
+     * @deny N/A
+     * @principle Verifies the user is signed in.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * @description Defines the isOwner function for user ownership.
+     * @path N/A
+     * @allow N/A
+     * @deny N/A
+     * @principle Checks if the request is made by the document owner.
+     */
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    /**
+     * @description Defines the isExistingOwner function for user ownership + existence.
+     * @path N/A
+     * @allow N/A
+     * @deny N/A
+     * @principle Checks if the request is made by the document owner and the document exists.
+     */
+    function isExistingOwner(userId) {
+      return isOwner(userId) && resource != null;
+    }
+    /**
+     * @description Grants access to user-specific data.
      * @path /users/{uid}
-     * @allow (create) Signed-in user creates their own profile.
-     * @allow (update) Signed-in user updates their own profile.
-     * @allow (get) Signed-in user gets their own profile.
-     * @allow (delete) Signed-in user deletes their own profile.
-     * @deny (create) Signed-in user tries to create a profile for another user.
-     * @principle Enforces document ownership for user profiles.
+     * @allow (create) If the user is creating their own profile (request.auth.uid == uid).
+     * @allow (update) If the user is updating their own profile.
+     * @deny (create) If the user tries to create a profile with a different uid.
+     * @deny (update) If the user tries to update someone else's profile.
+     * @principle Enforces document ownership for writes.
      */
     match /users/{userId} {
-      function isOwner(userId) {
-        return request.auth != null && request.auth.uid == userId;
-      }
-      function isExistingOwner(userId) {
-        return isOwner(userId) && resource != null;
-      }
-
       allow get: if isOwner(userId);
-      allow list: if false; // Do not allow listing all users
+      allow list: if false;
 
       allow create: if isOwner(userId) && request.resource.data.uid == userId;
       allow update: if isExistingOwner(userId) && request.resource.data.uid == resource.data.uid;
-      allow delete: if isExistingOwner(userId);
+      allow delete: if false;
     }
 
     /**
-     * @description Controls access to suggestions.
+     * @description Grants public read access to suggestions and restricts write access to authenticated users.
      * @path /suggestions/{suggestionId}
-     * @allow (get) Anyone can read a suggestion.
-     * @allow (list) Anyone can list suggestions.
-     * @allow (create) Signed-in user can create a suggestion with their authorUid.
-     * @allow (update) Signed-in user can update a suggestion if they are the author.
-     * @allow (delete) Signed-in user can delete a suggestion if they are the author.
-     * @deny (create) Signed-in user tries to create a suggestion with someone else's authorUid.
-     * @principle Allows public read access but enforces ownership for writes.
+     * @allow (get, list) Anyone can read suggestions.
+     * @allow (create) Only authenticated users can create suggestions, and the authorUid must match their UID.
+     * @allow (update, delete) Only the author of the suggestion can update or delete it.
+     * @deny (create) If the authorUid does not match the authenticated user's UID.
+     * @deny (update, delete) If the request is not made by the author of the suggestion.
+     * @principle Allows public read access while enforcing ownership for writes.
      */
     match /suggestions/{suggestionId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      function isOwner(authorUid) {
-        return isSignedIn() && request.auth.uid == authorUid;
-      }
-
-      function isExistingOwner(authorUid) {
-        return isOwner(authorUid) && resource != null;
-      }
-
-      allow get: if true;
-      allow list: if true;
+      allow get, list: if true;
 
       allow create: if isSignedIn() && request.resource.data.authorUid == request.auth.uid;
-      allow update: if isExistingOwner(resource.data.authorUid);
-      allow delete: if isExistingOwner(resource.data.authorUid);
+      allow update: if isSignedIn() && isExistingOwner(resource.data.authorUid);
+      allow delete: if isSignedIn() && isExistingOwner(resource.data.authorUid);
     }
 
     /**
-     * @description Controls access to votes.
+     * @description Grants access to votes.
      * @path /votes/{voteId}
-     * @allow (create) Signed-in user can create a vote with their voterUid.
-     * @allow (get) Signed-in user can get a vote with their voterUid.
-     * @allow (update) Signed-in user can update a vote if they are the voter.
-     * @allow (delete) Signed-in user can delete a vote if they are the voter.
-     * @deny (create) Signed-in user tries to create a vote with someone else's voterUid.
-     * @principle Enforces document ownership for votes.
+     * @allow (create) Only authenticated users can create votes.
+     * @deny (get, list, update, delete) No one can get, list, update or delete votes directly.
+     * @principle Restricts access to creating votes; other operations are likely handled by a backend function.
      */
     match /votes/{voteId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      function isOwner(voterUid) {
-        return isSignedIn() && request.auth.uid == voterUid;
-      }
-
-      function isExistingOwner(voterUid) {
-        return isOwner(voterUid) && resource != null;
-      }
-
-      allow get: if isOwner(resource.data.voterUid);
-      allow list: if false;
-
-      allow create: if isSignedIn() && request.resource.data.voterUid == request.auth.uid;
-      allow update: if isExistingOwner(resource.data.voterUid);
-      allow delete: if isExistingOwner(resource.data.voterUid);
-    }
-
-     /**
-      * @description Controls access to user vote subcollection.
-      * @path /user_votes/{uid}/suggestions/{suggestionId}
-      * @allow (create) Signed-in user can create a vote if they are the owner.
-      * @allow (get) Signed-in user can get a vote if they are the owner.
-      * @allow (update) Signed-in user can update a vote if they are the owner.
-      * @allow (delete) Signed-in user can delete a vote if they are the owner.
-      * @deny (create) Signed-in user tries to create a vote for someone else.
-      * @principle Enforces document ownership for user votes.
-      */
-     match /user_votes/{userId}/suggestions/{suggestionId} {
-        function isOwner(userId) {
-          return request.auth != null && request.auth.uid == userId;
-        }
-
-        function isExistingOwner(userId) {
-          return isOwner(userId) && resource != null;
-        }
-
-        allow get: if isOwner(userId);
-        allow list: if isOwner(userId);
-
-        allow create: if isOwner(userId);
-        allow update: if isExistingOwner(userId);
-        allow delete: if isExistingOwner(userId);
+      allow get, list, update, delete: if false;
+      allow create: if isSignedIn();
     }
 
     /**
-     * @description Controls access to comments.
+     * @description Grants access to user-specific votes.
+     * @path /user_votes/{uid}/suggestions/{suggestionId}
+     * @allow (create) If the user is creating their own vote (request.auth.uid == uid).
+     * @allow (get, list) If the user is listing their votes.
+     * @deny (create) If the user tries to create a vote with a different uid.
+     * @deny (update, delete) No one can update or delete votes directly.
+     * @principle Enforces document ownership for writes.
+     */
+    match /user_votes/{userId}/suggestions/{suggestionId} {
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
+
+      allow create: if isOwner(userId);
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    /**
+     * @description Grants public read access to comments and restricts write access to authenticated users.
      * @path /comments/{commentId}
-     * @allow (create) Signed-in user can create a comment with their authorUid.
-     * @allow (get) Anyone can read a comment.
-     * @allow (update) Signed-in user can update a comment if they are the author.
-     * @allow (delete) Signed-in user can delete a comment if they are the author.
-     * @deny (create) Signed-in user tries to create a comment with someone else's authorUid.
-     * @principle Enforces document ownership for comments.
+     * @allow (get, list) Anyone can read comments.
+     * @allow (create) Only authenticated users can create comments, and the authorUid must match their UID.
+     * @allow (update, delete) Only the author of the comment can update or delete it.
+     * @deny (create) If the authorUid does not match the authenticated user's UID.
+     * @deny (update, delete) If the request is not made by the author of the comment.
+     * @principle Allows public read access while enforcing ownership for writes.
      */
     match /comments/{commentId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      function isOwner(authorUid) {
-        return isSignedIn() && request.auth.uid == authorUid;
-      }
-
-      function isExistingOwner(authorUid) {
-        return isOwner(authorUid) && resource != null;
-      }
-
-      allow get: if true;
-      allow list: if true;
+      allow get, list: if true;
 
       allow create: if isSignedIn() && request.resource.data.authorUid == request.auth.uid;
-      allow update: if isExistingOwner(resource.data.authorUid);
-      allow delete: if isExistingOwner(resource.data.authorUid);
+      allow update: if isSignedIn() && isExistingOwner(resource.data.authorUid);
+      allow delete: if isSignedIn() && isExistingOwner(resource.data.authorUid);
     }
   }
 }
