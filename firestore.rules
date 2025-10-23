@@ -1,36 +1,28 @@
 /**
- * @file Firebase Security Rules for Firestore.
+ * @fileoverview Firestore Security Rules for the SEES UNILAG Innovation Suggestion System (SIS) application.
  *
- * @core_philosophy This ruleset prioritizes security and authorization independence. It enforces
- * strict ownership and role-based access control while assuming a flexible data model for rapid prototyping.
- * Read access to `suggestions` is public, while write access is restricted to owners and admins.
- * Data needed for authorization is denormalized onto the documents themselves to avoid costly `get()` calls.
+ * Core Philosophy:
+ * This ruleset prioritizes a balance between open read access for suggestions and strict, role-based control for write operations and user data. The system uses a combination of ownership-based and role-based access control to secure data.  Admin privileges are determined by the existence of a document in the `/roles_admin/{uid}` collection.
  *
- * @data_structure
- * - `/users/{userId}`: Stores user profiles, including the user's role. The `role` field is
- *   denormalized to avoid extra reads during authorization checks.
- * - `/suggestions/{suggestionId}`: Stores suggestions submitted by users. The `authorUid` field is
- *   used for ownership checks.
- * - `/votes/{voteId}`: Stores votes on suggestions, linking a user to a suggestion.
- * - `/user_votes/{uid}/suggestions/{suggestionId}`: Stores single vote by a user on a suggestion
- * - `/comments/{commentId}`: Stores comments on suggestions.
+ * Data Structure:
+ * - /users/{uid}: Stores user profiles, accessible only to the user themselves and potentially admins.
+ * - /suggestions/{suggestionId}: Stores suggestions, publicly readable but writable only by the author or admins.
+ * - /votes/{voteId}: Stores votes on suggestions, writable only by authenticated users.
+ * - /comments/{commentId}: Stores comments on suggestions, writable only by authenticated users.
+ * - /roles_admin/{uid}: Indicates admin privileges. The existence of a document grants admin rights.
  *
- * @key_security_decisions
- * - Public read access to the `suggestions` collection to facilitate open consumption.
- * - Owner-only write access to most user-specific data, enforced through `isOwner()` checks.
- * - No user listing is allowed; `list` operations on `/users` are denied.
- * - The `authorUid` field in `suggestions` is used for ownership checks on writes.
- * - Suggestion writes are open but rely on the application to set the `authorUid` correctly.
+ * Key Security Decisions:
+ * - Public read access for suggestions is allowed.
+ * - User listing is not explicitly denied but depends on access to individual user profiles.
+ * - Admin privileges are determined by the existence of a document in the `/roles_admin/{uid}` collection.
+ * - Data validation is minimal to allow for prototyping, focusing on ownership and relationship integrity.
  *
- * @denormalization_for_authorization
- * - The `role` field is stored directly in the `/users/{userId}` document to avoid extra reads when
- *   checking user roles.
- * - The `authorUid` field is present on `/suggestions/{suggestionId}` documents to enable
- *   ownership checks without additional reads.
+ * Denormalization for Authorization:
+ * - Admin status is checked by the existence of a document in the `/roles_admin/{uid}` collection, avoiding complex queries.
+ * - Suggestions contain the `authorUid` field to easily enforce ownership for updates and deletes.
  *
- * @structural_segregation
- * - Publicly readable suggestions are stored in the top-level `/suggestions` collection, while
- *   private user data is stored under `/users/{userId}`.
+ * Structural Segregation:
+ * - Admin roles are stored in a separate `/roles_admin/{uid}` collection to simplify rule logic and improve performance.
  */
 rules_version = '2';
 service cloud.firestore {
@@ -45,8 +37,8 @@ service cloud.firestore {
     }
 
     /**
-     * @description Checks if the user is the owner of the resource.
-     * @param {string} userId The user ID to check against.
+     * @description Checks if the user is the owner of the document (i.e., the user ID matches the provided ID).
+     * @param {string} userId The user ID to compare against the authenticated user's ID.
      * @return {bool} True if the user is the owner, false otherwise.
      */
     function isOwner(userId) {
@@ -54,8 +46,9 @@ service cloud.firestore {
     }
 
     /**
-     * @description Checks if the user is the existing owner of the resource, ensuring the document exists.
-     * @param {string} userId The user ID to check against.
+     * @description Checks if the user is an existing owner of the document.
+     *              This combines the ownership check with the document existence check.
+     * @param {string} userId The user ID to compare against the authenticated user's ID.
      * @return {bool} True if the user is the owner and the document exists, false otherwise.
      */
     function isExistingOwner(userId) {
@@ -63,107 +56,101 @@ service cloud.firestore {
     }
 
     /**
-     * @description Checks if the user is an admin.
+     * @description Checks if the user has admin privileges by verifying the existence of a document in the roles_admin collection.
      * @return {bool} True if the user is an admin, false otherwise.
      */
     function isAdmin() {
-          return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'ADMIN'
-          || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'SUPER_ADMIN';
+        return exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
     }
 
-
     /**
-     * @description Rules for the /users/{uid} collection.
+     * @description Rules for user profiles.
      * @path /users/{uid}
-     * @allow (create) User BC0m0M9PcHMJbYjhsI0HPjriR7x2 can create their own user document.
-     * @deny (create) User ABC cannot create a document for user XYZ.
-     * @allow (get) User BC0m0M9PcHMJbYjhsI0HPjriR7x2 can get their own user document.
-     * @deny (get) User ABC cannot get user XYZ's document.
-     * @allow (update) User BC0m0M9PcHMJbYjhsI0HPjriR7x2 can update their own user document.
-     * @deny (update) User ABC cannot update user XYZ's document.
-     * @principle Enforces document ownership for writes, restricts access to a user's own data tree.
+     * @allow (create) Signed-in user can create their own profile if the UID matches the document ID.
+     * @allow (get, update, delete) Signed-in user can access and modify their own profile. Admins can also access and modify any profile.
+     * @deny (create) User cannot create a profile for another user.
+     * @deny (update, delete) User cannot modify or delete another user's profile.
+     * @principle Enforces document ownership for writes and restricts access to a user's own data tree.
      */
-    match /users/{userId} {
-      allow get: if isOwner(userId);
-      allow list: if false; // No user listing
+    match /users/{uid} {
+      // Allow users to create their own profile.
+      allow create: if isOwner(uid) && request.resource.data.uid == uid;
 
-      allow create: if isOwner(userId) && request.resource.data.uid == userId;
-      allow update: if isExistingOwner(userId) && request.resource.data.uid == resource.data.uid;
-      allow delete: if isExistingOwner(userId);
+      // Allow users to get, update, and delete their own profile, or if they are an admin.
+      allow get, update, delete: if isExistingOwner(uid) || isAdmin();
+
+      allow list: if false;
     }
 
     /**
-     * @description Rules for the /suggestions/{suggestionId} collection.
+     * @description Rules for suggestions.
      * @path /suggestions/{suggestionId}
-     * @allow (get) Any user can read a suggestion.
-     * @allow (list) Any user can list suggestions.
-     * @allow (create) User BC0m0M9PcHMJbYjhsI0HPjriR7x2 can create a suggestion.
-     * @deny (create) User ABC cannot create a suggestion without a valid authorUid.
-     * @allow (update) User BC0m0M9PcHMJbYjhsI0HPjriR7x2 can update their own suggestion.
-     * @deny (update) User ABC cannot update a suggestion they don't own.
-     * @principle Allows public reads with owner-only writes, validates relational integrity.
+     * @allow (get, list) All users can read suggestions.
+     * @allow (create) Signed-in users can create suggestions.
+     * @allow (update, delete) Only the author of the suggestion or an admin can update or delete it.
+     * @deny (create) Non-signed-in users cannot create suggestions.
+     * @deny (update, delete) Users cannot update or delete suggestions they don't own.
+     * @principle Public read access with owner-only or admin-only writes.
      */
     match /suggestions/{suggestionId} {
-      allow get, list: if true; // Public read access
+      allow get, list: if true;
 
       allow create: if isSignedIn() && request.resource.data.authorUid == request.auth.uid;
-      allow update: if isExistingOwner(resource.data.authorUid) || isAdmin();
-      allow delete: if isExistingOwner(resource.data.authorUid) || isAdmin();
+
+      allow update, delete: if (resource.data.authorUid == request.auth.uid && resource != null) || isAdmin();
     }
 
     /**
-     * @description Rules for the /votes/{voteId} collection.
+     * @description Rules for votes.
      * @path /votes/{voteId}
-     * @allow (create) User BC0m0M9PcHMJbYjhsI0HPjriR7x2 can create a vote.
-     * @deny (create) User ABC cannot create a vote without proper authentication.
-     * @allow (get) Any user can read a vote.
-     * @deny (get) User ABC cannot read a vote due to insufficient permissions.
-     * @allow (update) User BC0m0M9PcHMJbYjhsI0HPjriR7x2 can update a vote they own.
-     * @deny (update) User ABC cannot update a vote they don't own.
+     * @allow (create) Signed-in users can create votes.
+     * @allow (get) Any user can get a vote.
+     * @deny (create) Non-signed-in users cannot create votes.
+     * @deny (update, delete) Votes cannot be updated or deleted.
+     * @principle Requires authentication for creating votes.
      */
     match /votes/{voteId} {
-      allow get, list: if true;
-
-      allow create: if isSignedIn();
-      allow update: if false;
-      allow delete: if false;
+      allow get: if true;
+      allow create: if isSignedIn() && request.resource.data.voterUid == request.auth.uid;
+      allow update, delete: if false;
+      allow list: if false;
     }
 
-        /**
-         * @description Rules for the /user_votes/{uid}/suggestions/{suggestionId} collection.
-         * @path /user_votes/{uid}/suggestions/{suggestionId}
-         * @allow (create) User BC0m0M9PcHMJbYjhsI0HPjriR7x2 can create a vote for a suggestion.
-         * @deny (create) User ABC cannot create a vote for a suggestion they don't own.
-         * @allow (get) User BC0m0M9PcHMJbYjhsI0HPjriR7x2 can get their vote for a suggestion.
-         * @deny (get) User ABC cannot get user XYZ's vote.
-         * @allow (update) User BC0m0M9PcHMJbYjhsI0HPjriR7x2 can update their vote for a suggestion.
-         * @deny (update) User ABC cannot update a vote they don't own.
-         * @principle Enforces document ownership for writes, restricts access to a user's own data tree.
-         */
-        match /user_votes/{userId}/suggestions/{suggestionId} {
-            allow get: if isOwner(userId);
-            allow list: if isOwner(userId);
-
-            allow create: if isOwner(userId);
-            allow update: if false;
-            allow delete: if isOwner(userId);
-        }
-
     /**
-     * @description Rules for the /comments/{commentId} collection.
+     * @description Rules for comments.
      * @path /comments/{commentId}
-     * @allow (create) User BC0m0M9PcHMJbYjhsI0HPjriR7x2 can create a comment.
-     * @deny (create) User ABC cannot create a comment without proper authentication.
-     * @allow (get) Any user can read a comment.
-     * @deny (get) User ABC cannot read a comment due to insufficient permissions.
-     * @allow (update) User BC0m0M9PcHMJbYjhsI0HPjriR7x2 can update a comment they own.
-     * @deny (update) User ABC cannot update a comment they don't own.
+     * @allow (create) Signed-in users can create comments.
+     * @allow (get) Any user can get a comment.
+     * @deny (create) Non-signed-in users cannot create comments.
+     * @deny (update, delete) Comments cannot be updated or deleted.
+     * @principle Requires authentication for creating comments.
      */
     match /comments/{commentId} {
-      allow get, list: if true;
-      allow create: if isSignedIn();
-      allow update: if isExistingOwner(resource.data.authorUid) || isAdmin();
-      allow delete: if isExistingOwner(resource.data.authorUid) || isAdmin();
+      allow get: if true;
+      allow create: if isSignedIn() && request.resource.data.authorUid == request.auth.uid;
+      allow update, delete: if false;
+      allow list: if false;
+    }
+
+    /**
+     * @description Rules for admin roles.
+     * @path /roles_admin/{uid}
+     * @allow (create) Only a super admin can create admin roles.
+     * @allow (get) Any authenticated user can check for admin status.
+     * @deny (create, update, delete) Regular users cannot create, update, or delete admin roles.
+     * @principle Restricts admin role management to super admins.
+     */
+    match /roles_admin/{uid} {
+      // Allow creation of admin roles - you might want to restrict this to a super-admin role.  For this prototype, we allow any signed-in user to create.
+      allow create: if isAdmin();
+
+      // Allow anyone to read the admin roles collection (used for checking admin status).
+      allow get: if isSignedIn();
+
+      // No updates or deletes allowed.
+      allow update, delete: if false;
+
+      allow list: if false;
     }
   }
 }

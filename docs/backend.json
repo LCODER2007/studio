@@ -1,4 +1,3 @@
-
 {
   "entities": {
     "Suggestion": {
@@ -9,7 +8,8 @@
       "properties": {
         "suggestionId": {
           "type": "string",
-          "description": "Unique identifier for the suggestion entity."
+          "description": "Unique identifier for the suggestion entity.",
+          "format": "uuid"
         },
         "title": {
           "type": "string",
@@ -18,38 +18,23 @@
         },
         "body": {
           "type": "string",
-          "description": "Detailed description of the suggestion.",
-          "format": "string"
+          "description": "Detailed description of the suggestion."
         },
         "authorUid": {
           "type": "string",
-          "description": "Reference to the User who created the suggestion. Can also be 'ANONYMOUS'."
-        },
-        "authorDisplayName": {
-          "type": "string",
-          "description": "Display name of the user who created the suggestion."
-        },
-        "authorPhotoURL": {
-          "type": "string",
-          "description": "Photo URL of the user who created the suggestion."
+          "description": "Reference to User. Unique identifier of the user who created the suggestion. Can be 'ANONYMOUS'."
         },
         "category": {
           "type": "string",
-          "description": "Category of the suggestion (ACADEMIC_CURRICULUM, INFRASTRUCTURE_IT, TECHNICAL_DESIGN, ENVIRONMENTAL_SUSTAINABILITY, ADMINISTRATIVE_SEES, OTHER).",
-          "format": "string"
+          "description": "Category of the suggestion (ACADEMIC_CURRICULUM, INFRASTRUCTURE_IT, TECHNICAL_DESIGN, ENVIRONMENTAL_SUSTAINABILITY, ADMINISTRATIVE_SEES, OTHER)."
         },
         "status": {
           "type": "string",
-          "description": "Status of the suggestion (SUBMITTED, UNDER_REVIEW, SHORTLISTED, ARCHIVED_REJECTED, IMPLEMENTED).",
-          "format": "string"
+          "description": "Status of the suggestion (SUBMITTED, UNDER_REVIEW, SHORTLISTED, ARCHIVED_REJECTED, IMPLEMENTED)."
         },
         "upvotesCount": {
           "type": "number",
-          "description": "Number of upvotes for the suggestion."
-        },
-        "commentsCount": {
-          "type": "number",
-          "description": "Number of comments for the suggestion."
+          "description": "Number of upvotes the suggestion has received."
         },
         "impactScore": {
           "type": "number",
@@ -65,7 +50,7 @@
         },
         "reviewerUid": {
           "type": "string",
-          "description": "Reference to the User (Admin) who reviewed the suggestion."
+          "description": "Reference to User. Unique identifier of the admin/reviewer user who reviewed the suggestion."
         },
         "submissionTimestamp": {
           "type": "string",
@@ -74,7 +59,7 @@
         },
         "publicFeedback": {
           "type": "string",
-          "description": "Public feedback on the suggestion."
+          "description": "Public feedback or comments on the suggestion."
         }
       },
       "required": [
@@ -82,11 +67,9 @@
         "title",
         "body",
         "authorUid",
-        "authorDisplayName",
         "category",
         "status",
         "upvotesCount",
-        "commentsCount",
         "submissionTimestamp"
       ]
     },
@@ -102,21 +85,23 @@
         },
         "email": {
           "type": "string",
-          "description": "Email address of the user.",
+          "description": "User's email address.",
           "format": "email"
         },
         "displayName": {
           "type": "string",
-          "description": "Display name of the user."
+          "description": "User's display name."
         },
         "role": {
           "type": "string",
-          "description": "Role of the user (STUDENT, ADMIN, SUPER_ADMIN)."
+          "description": "User's role (STUDENT, ADMIN, SUPER_ADMIN)."
         }
       },
       "required": [
         "uid",
-        "email"
+        "email",
+        "displayName",
+        "role"
       ]
     },
     "Vote": {
@@ -127,41 +112,23 @@
       "properties": {
         "suggestionId": {
           "type": "string",
-          "description": "Reference to the Suggestion being voted on. (Relationship: Suggestion 1:N Vote)"
+          "description": "Reference to Suggestion. Unique identifier of the suggestion being voted on."
         },
         "voterUid": {
           "type": "string",
-          "description": "Reference to the User who cast the vote. (Relationship: User 1:N Vote)"
+          "description": "Reference to User. Unique identifier of the user casting the vote."
         },
         "timestamp": {
           "type": "string",
           "description": "Timestamp of when the vote was cast.",
           "format": "date-time"
-        },
-        "voteId": {
-          "type": "string",
-          "description": "Unique identifier for the vote entity."
         }
       },
       "required": [
         "suggestionId",
         "voterUid",
-        "timestamp",
-        "voteId"
+        "timestamp"
       ]
-    },
-    "UserVote": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "User Vote",
-      "description": "A document representing a single vote by a user on a suggestion.",
-      "type": "object",
-      "properties": {
-          "suggestionId": {
-              "type": "string",
-              "description": "The ID of the suggestion that was voted on."
-          }
-      },
-      "required": ["suggestionId"]
     },
     "Comment": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -175,19 +142,11 @@
         },
         "suggestionId": {
           "type": "string",
-          "description": "Reference to the Suggestion the comment belongs to. (Relationship: Suggestion 1:N Comment)"
+          "description": "Reference to Suggestion. Unique identifier of the suggestion being commented on."
         },
         "authorUid": {
           "type": "string",
-          "description": "Reference to the User who wrote the comment. (Relationship: User 1:N Comment)"
-        },
-        "authorDisplayName": {
-            "type": "string",
-            "description": "Display name of the user who wrote the comment."
-        },
-        "authorPhotoURL": {
-            "type": "string",
-            "description": "Photo URL of the user who wrote the comment."
+          "description": "Reference to User. Unique identifier of the user who wrote the comment."
         },
         "body": {
           "type": "string",
@@ -211,7 +170,7 @@
   "auth": {
     "providers": [
       "password",
-      "google.com"
+      "anonymous"
     ]
   },
   "firestore": {
@@ -223,7 +182,7 @@
           "schema": {
             "$ref": "#/backend/entities/User"
           },
-          "description": "Stores user profile information, including the user's role. Used to determine authorization for various actions. Includes denormalized 'role' for authorization independence.",
+          "description": "Stores user profiles. The 'uid' is the document ID.",
           "params": [
             {
               "name": "uid",
@@ -239,7 +198,7 @@
           "schema": {
             "$ref": "#/backend/entities/Suggestion"
           },
-          "description": "Stores suggestions submitted by users. 'authorUid' is used to track the suggestion's author; can be 'ANONYMOUS' for anonymous submissions. Includes fields for admin evaluation (impactScore, feasibilityRating, costEffectivenessRating).",
+          "description": "Contains suggestion documents. The 'authorUid' field indicates the creator.",
           "params": [
             {
               "name": "suggestionId",
@@ -255,31 +214,11 @@
           "schema": {
             "$ref": "#/backend/entities/Vote"
           },
-          "description": "Stores user votes for suggestions. Enforces one vote per user per suggestion using a composite key of suggestionId and voterUid. This collection triggers the `triggerVoteUpdate` Cloud Function.",
+          "description": "Stores user votes on suggestions.  Includes 'suggestionId' and 'voterUid'.",
           "params": [
             {
               "name": "voteId",
-              "description": "The unique identifier of the vote."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/user_votes/{uid}/suggestions/{suggestionId}",
-        "definition": {
-          "entityName": "UserVote",
-          "schema": {
-            "$ref": "#/backend/entities/UserVote"
-          },
-          "description": "A subcollection to track which suggestions a user has voted for. This allows for efficient and secure checking of a user's vote status.",
-          "params": [
-            {
-                "name": "uid",
-                "description": "The unique identifier of the user."
-            },
-            {
-                "name": "suggestionId",
-                "description": "The unique identifier of the suggestion."
+              "description": "The unique identifier of the vote, can be a combination of userId and suggestionId."
             }
           ]
         }
@@ -291,7 +230,7 @@
           "schema": {
             "$ref": "#/backend/entities/Comment"
           },
-          "description": "Stores comments on suggestions. Each comment is associated with a specific suggestion via the suggestionId field.",
+          "description": "Stores comments on suggestions. Includes 'suggestionId' to link comments to their respective suggestions, and 'authorUid' for comment authorship.",
           "params": [
             {
               "name": "commentId",
@@ -299,10 +238,24 @@
             }
           ]
         }
+      },
+      {
+        "path": "/roles_admin/{uid}",
+        "definition": {
+          "entityName": "roles_admin",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Documents in this collection indicate admin privileges for a user. The existence of a document with a user's 'uid' as the document ID grants admin rights.",
+          "params": [
+            {
+              "name": "uid",
+              "description": "The unique identifier of the admin user."
+            }
+          ]
+        }
       }
     ],
-    "reasoning": "The Firestore data structure is designed to ensure security, scalability, and debuggability, while adhering to Authorization Independence. The core principle is to avoid hierarchical authorization dependencies by denormalizing data and utilizing structural segregation for homogeneous security postures. The structure incorporates explicit state modeling for clarity and predictable schemas.\n\nAuthorization Independence is achieved by storing the 'role' property directly within the `/users/{uid}` document. This eliminates the need for `get()` calls in security rules to determine user roles. For the suggestions, the `authorUid` field is used, allowing for anonymous submissions via the 'ANONYMOUS' string literal. The `suggestions` documents do not depend on any data outside themselves for authorization decisions.\n\nQAPs (Rules are not Filters) are supported by segregating data based on access needs and using membership models. Read access is granted broadly on `/suggestions` as read access is required by all users, including unauthenticated ones. Write/Update access is limited through security rules based on the user's role which is checked by reading the `/users/{uid}` collection. The use of the `/votes` collection ensures that a user can only vote once per suggestion. Each vote document contains both `suggestionId` and `voterUid`, providing a clear link between the suggestion and the user who voted, which is essential for the `triggerVoteUpdate` Cloud Function.\n\nInvariants are maintained through the enforcement of ownership for user-specific data via path-based rules for the `/users/{uid}` collection. Timestamps are automatically generated and are immutable. Data integrity is also ensured through the custom claims mechanism, which is securely set server-side."
+    "reasoning": "The Firestore data structure is designed to support the SEES UNILAG Innovation Suggestion System (SIS) application, focusing on security, scalability, and maintainability. The structure adheres to the principle of Authorization Independence by denormalizing authorization context where necessary, especially concerning collaborative data. Structural Segregation is used to ensure that collections contain documents with homogeneous security postures, simplifying security rules. Access Modeling employs path-based ownership for user-related data and the Membership Map pattern for collaborative data.\n\nSpecifically:\n\n*   **/users/{uid}**: Stores user profiles. User roles are managed here, but for increased security and efficiency in rules, a separate collection for admin roles is also utilized.  The user's `uid` is the document ID, enabling direct access to user data.\n*   **/suggestions/{suggestionId}**: Contains suggestion documents. The `authorUid` field indicates the creator. All suggestions are readable, but updates to certain fields are restricted to admins.\n*   **/votes/{voteId}**: Stores user votes on suggestions. The vote ID can be a combination of `userId` and `suggestionId` to ensure uniqueness. Includes `suggestionId` and `voterUid`.\n*   **/comments/{commentId}**: Stores comments on suggestions. Includes `suggestionId` to link comments to their respective suggestions, and `authorUid` for comment authorship.\n*   **/roles_admin/{uid}**: Documents in this collection indicate admin privileges for a user. The existence of a document with a user's `uid` as the document ID grants admin rights. This approach simplifies security rules by allowing a simple `exists()` check.\n\nThis design enables secure `list` operations and avoids complex queries or client-side filtering. Security rules are straightforward due to denormalization and structural segregation, allowing for atomic operations and improved debuggability."
   }
 }
-
-    
