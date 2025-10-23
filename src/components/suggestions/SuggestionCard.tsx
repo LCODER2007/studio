@@ -49,9 +49,6 @@ export default function SuggestionCard({ suggestion, onUpvote, hasUpvoted }: Sug
   
   const suggestionLink = `/suggestion/${suggestion.suggestionId}`;
 
-  // Upvote count is only displayed if the suggestion's status is 'SHORTLISTED' or 'IMPLEMENTED'
-  const showUpvotes = suggestion.status === 'SHORTLISTED' || suggestion.status === 'IMPLEMENTED';
-
   return (
     <Card className="flex flex-col h-full transition-all hover:shadow-md">
       <Link href={suggestionLink} className="flex flex-col flex-grow">
@@ -105,11 +102,9 @@ export default function SuggestionCard({ suggestion, onUpvote, hasUpvoted }: Sug
         >
           <ArrowUp className={cn("mr-2 h-4 w-4", hasUpvoted ? "text-white" : "group-hover:animate-bounce")} />
           <span>{hasUpvoted ? "Upvoted" : "Upvote"}</span>
-          {showUpvotes && (
-            <span className={cn("ml-2 tabular-nums font-semibold", hasUpvoted && "text-white")}>
-              {suggestion.upvotesCount}
-            </span>
-          )}
+          <span className={cn("ml-2 tabular-nums font-semibold", hasUpvoted && "text-white")}>
+            {suggestion.upvotesCount}
+          </span>
         </Button>
         <Link href={suggestionLink} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary">
           <MessageSquare className="h-4 w-4" />
