@@ -31,17 +31,18 @@ export default function SuggestionList() {
     if (filters.category !== 'all') {
       q = query(q, where('category', '==', filters.category));
     }
-    if (filters.status !== 'all') {
-      q = query(q, where('status', '==', filters.status));
-    }
+    // We don't filter by status on the main page anymore, show all.
+    // if (filters.status !== 'all') {
+    //   q = query(q, where('status', '==', filters.status));
+    // }
 
     // Apply sorting
     // Note: Firestore requires an index for this query. 
-    // If you have issues, create a composite index on (category, status, upvotesCount) and (category, status, submissionTimestamp).
+    // If you have issues, create a composite index on (category, upvotesCount) and (category, submissionTimestamp).
     q = query(q, orderBy(sortBy, 'desc'));
 
     return q;
-  }, [firestore, filters, sortBy]);
+  }, [firestore, filters.category, sortBy]);
 
   const { data: suggestions, isLoading } = useCollection<Suggestion>(suggestionsQuery);
 
@@ -77,7 +78,6 @@ export default function SuggestionList() {
   const handleUpvote = useCallback((suggestionId: string) => {
     if (!firestore || !user) return;
     
-    // Check if user has already upvoted to prevent double-voting (client-side)
     if (upvotedIds.has(suggestionId)) {
         toast({
             variant: "destructive",
@@ -90,7 +90,6 @@ export default function SuggestionList() {
     // Create a reference to a new document in the 'votes' collection.
     const voteRef = doc(collection(firestore, 'votes'));
     
-    // Add the vote document. This will trigger the cloud function.
     addDocumentNonBlocking(voteRef, {
         voteId: voteRef.id,
         suggestionId,
@@ -122,8 +121,10 @@ export default function SuggestionList() {
   
   if (isLoading) {
     return (
-        <div className="text-center py-20">
-            <h2 className="text-2xl font-semibold animate-pulse">Loading Suggestions...</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[...Array(6)].map((_, i) => (
+                <div key={i} className="h-[350px] w-full animate-pulse rounded-lg bg-muted" />
+            ))}
         </div>
     );
   }
