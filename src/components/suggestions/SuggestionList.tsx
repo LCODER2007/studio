@@ -121,10 +121,17 @@ export default function SuggestionList() {
   
   if (isLoading) {
     return (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[...Array(6)].map((_, i) => (
-                <div key={i} className="h-[350px] w-full animate-pulse rounded-lg bg-muted" />
-            ))}
+        <div>
+            <SuggestionFilters
+                onOpenSubmitDialog={handleOpenSubmitDialog}
+                onFilterChange={handleFilterChange}
+                onSortChange={handleSortChange}
+            />
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {[...Array(6)].map((_, i) => (
+                    <div key={i} className="h-[350px] w-full animate-pulse rounded-lg bg-muted" />
+                ))}
+            </div>
         </div>
     );
   }
