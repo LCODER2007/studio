@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { FileText, Lightbulb } from 'lucide-react';
+import { AreaChart, FileText, Lightbulb } from 'lucide-react';
 import React, { useEffect } from 'react';
 
 import {
@@ -20,7 +20,7 @@ import RoleGuard from '@/components/RoleGuard';
 import { useAuth } from '@/components/auth/AuthContext';
 import { AuthButton } from '@/components/auth/AuthButton';
 
-export default function AdminDashboardLayout({ children }: { children: React.ReactNode }) {
+export default function SuperAdminDashboardLayout({ children }: { children: React.ReactNode }) {
     const { loading, user } = useAuth();
     const pathname = usePathname();
     const router = useRouter();
@@ -40,7 +40,7 @@ export default function AdminDashboardLayout({ children }: { children: React.Rea
     }
   
   return (
-    <RoleGuard roles={['ADMIN', 'SUPER_ADMIN']}>
+    <RoleGuard roles={['SUPER_ADMIN']}>
       <SidebarProvider>
         <div className="flex min-h-screen">
             <Sidebar collapsible="icon">
@@ -53,10 +53,18 @@ export default function AdminDashboardLayout({ children }: { children: React.Rea
             <SidebarContent>
                 <SidebarMenu>
                 <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={pathname === '/admin'} tooltip="Suggestions">
+                    <SidebarMenuButton asChild isActive={pathname === '/admin'} tooltip="Dashboard">
                         <Link href="/admin">
+                            <AreaChart />
+                            <span>Dashboard</span>
+                        </Link>
+                    </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={pathname === '/admin/triage'} tooltip="Triage">
+                        <Link href="/admin/triage">
                             <FileText />
-                            <span>Suggestions</span>
+                            <span>Triage</span>
                         </Link>
                     </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -67,7 +75,7 @@ export default function AdminDashboardLayout({ children }: { children: React.Rea
                 <header className="sticky top-0 z-40 flex h-16 items-center gap-4 border-b bg-background px-4 md:px-6">
                     <SidebarTrigger className="md:hidden" />
                     <div className="flex-1">
-                        <h1 className="text-xl font-semibold">Admin Dashboard</h1>
+                        <h1 className="text-xl font-semibold">Super Admin Dashboard</h1>
                     </div>
                     <AuthButton />
                 </header>

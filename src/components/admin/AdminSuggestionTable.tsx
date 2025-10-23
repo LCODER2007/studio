@@ -16,12 +16,6 @@ import {
 import { ChevronDown, Edit } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import {
   Table,
@@ -33,21 +27,18 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import type { Suggestion } from "@/lib/types";
-import { SuggestionStatuses } from "@/lib/types";
 import { format } from "date-fns";
 
 interface AdminSuggestionTableProps {
     suggestions: Suggestion[];
     onEdit: (suggestion: Suggestion) => void;
-    onFilterStatusChange: (status: string) => void;
 }
 
-export default function AdminSuggestionTable({ suggestions, onEdit, onFilterStatusChange }: AdminSuggestionTableProps) {
+export default function AdminSuggestionTable({ suggestions, onEdit }: AdminSuggestionTableProps) {
   const [sorting, setSorting] = React.useState<SortingState>([
     { id: "submissionTimestamp", desc: true },
   ]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
-  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = React.useState({});
 
   const columns: ColumnDef<Suggestion>[] = [
@@ -82,19 +73,8 @@ export default function AdminSuggestionTable({ suggestions, onEdit, onFilterStat
         header: "Upvotes",
         cell: ({ row }) => {
             const suggestion = row.original;
-            const showUpvotes = suggestion.status === 'SHORTLISTED' || suggestion.status === 'IMPLEMENTED';
-            return <div className="text-center">{showUpvotes ? row.getValue("upvotesCount") : "-"}</div>
+            return <div className="text-center">{row.getValue("upvotesCount")}</div>
         },
-    },
-    {
-        id: "avgScore",
-        header: "Avg. Score",
-        cell: ({ row }) => {
-            const { impactScore, feasibilityRating, costEffectivenessRating } = row.original;
-            if (!impactScore || impactScore === 0) return <div className="text-center text-muted-foreground">N/A</div>;
-            const avg = ((impactScore + feasibilityRating + costEffectivenessRating) / 3).toFixed(1);
-            return <div className="text-center font-mono">{avg}</div>
-        }
     },
     {
       id: "actions",
@@ -117,12 +97,10 @@ export default function AdminSuggestionTable({ suggestions, onEdit, onFilterStat
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
-    onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
     state: {
       sorting,
       columnFilters,
-      columnVisibility,
       rowSelection,
     },
     initialState: {
@@ -131,10 +109,6 @@ export default function AdminSuggestionTable({ suggestions, onEdit, onFilterStat
         }
     }
   });
-
-  React.useEffect(() => {
-    table.getColumn("status")?.setFilterValue("SUBMITTED");
-  }, [table]);
 
   return (
     <div className="w-full">
@@ -147,37 +121,6 @@ export default function AdminSuggestionTable({ suggestions, onEdit, onFilterStat
           }
           className="max-w-sm"
         />
-        <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="ml-auto">
-                    Filter by Status <ChevronDown className="ml-2 h-4 w-4" />
-                </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-                <DropdownMenuCheckboxItem
-                    checked={!table.getColumn("status")?.getFilterValue()}
-                    onCheckedChange={() => {
-                        table.getColumn("status")?.setFilterValue(undefined)
-                        onFilterStatusChange('all');
-                    }}
-                >
-                    All Statuses
-                </DropdownMenuCheckboxItem>
-                {SuggestionStatuses.map((status) => (
-                    <DropdownMenuCheckboxItem
-                        key={status}
-                        className="capitalize"
-                        checked={(table.getColumn("status")?.getFilterValue() as string) === status}
-                        onCheckedChange={() => {
-                            table.getColumn("status")?.setFilterValue(status)
-                            onFilterStatusChange(status)
-                        }}
-                    >
-                        {status.replace(/_/g, " ").toLowerCase()}
-                    </DropdownMenuCheckboxItem>
-                ))}
-            </DropdownMenuContent>
-        </DropdownMenu>
       </div>
       <div className="rounded-md border bg-card">
         <Table>

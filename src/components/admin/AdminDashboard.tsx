@@ -7,34 +7,15 @@ import { EditSuggestionSheet } from './EditSuggestionSheet';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, doc, query, where, orderBy, Query, DocumentData } from 'firebase/firestore';
 import { updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
-import { Button } from '../ui/button';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu';
-import { ChevronDown } from 'lucide-react';
 
 export default function AdminDashboard() {
   const firestore = useFirestore();
   const [editingSuggestion, setEditingSuggestion] = useState<Suggestion | null>(null);
-  const [filters, setFilters] = useState<{ status: string; scoreType: string | null }>({
-    status: 'SUBMITTED',
-    scoreType: null,
-  });
-
+  
   const suggestionsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
-    let q: Query<DocumentData> = collection(firestore, 'suggestions');
-
-    if (filters.status !== 'all') {
-      q = query(q, where('status', '==', filters.status));
-    }
-
-    if (filters.scoreType) {
-      q = query(q, orderBy(filters.scoreType, 'desc'));
-    } else {
-      q = query(q, orderBy('submissionTimestamp', 'desc'));
-    }
-
-    return q;
-  }, [firestore, filters]);
+    return query(collection(firestore, 'suggestions'), where('status', '==', 'SUBMITTED'), orderBy('submissionTimestamp', 'desc'));
+  }, [firestore]);
 
   const { data: suggestions, isLoading } = useCollection<Suggestion>(suggestionsQuery);
 
@@ -59,24 +40,7 @@ export default function AdminDashboard() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-end space-x-4">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline">
-              Filter by Score <ChevronDown className="ml-2 h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent>
-            <DropdownMenuItem onSelect={() => setFilters(prev => ({ ...prev, scoreType: null }))}>None</DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => setFilters(prev => ({ ...prev, scoreType: 'impactScore' }))}>Impact Score</DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => setFilters(prev => ({ ...prev, scoreType: 'feasibilityRating' }))}>Feasibility Rating</DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => setFilters(prev => ({ ...prev, scoreType: 'costEffectivenessRating' }))}>Cost-Effectiveness</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-
-      <AdminSuggestionTable suggestions={suggestions || []} onEdit={handleEdit} onFilterStatusChange={(status) => setFilters(prev => ({ ...prev, status }))} />
-
+      <AdminSuggestionTable suggestions={suggestions || []} onEdit={handleEdit} />
       <EditSuggestionSheet
         suggestion={editingSuggestion}
         open={!!editingSuggestion}

@@ -6,6 +6,7 @@ import {
   LogOut,
   Shield,
   User,
+  Crown
 } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/components/auth/AuthContext";
@@ -19,6 +20,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Badge } from "../ui/badge";
 
 export function AuthButton() {
   const { user, role, logout, loading } = useAuth();
@@ -50,7 +52,14 @@ export function AuthButton() {
           </Avatar>
           <div className="hidden md:flex flex-col items-start">
             <span className="text-sm font-medium">{user.displayName}</span>
-            <span className="text-xs text-muted-foreground">{role}</span>
+            {role === 'SUPER_ADMIN' ? (
+                <Badge variant="destructive" className="flex items-center gap-1">
+                    <Crown className="h-3 w-3" />
+                    SUPER ADMIN
+                </Badge>
+            ) : (
+                <span className="text-xs text-muted-foreground">{role}</span>
+            )}
           </div>
           <ChevronDown className="h-4 w-4 text-muted-foreground" />
         </Button>
@@ -58,7 +67,7 @@ export function AuthButton() {
       <DropdownMenuContent className="w-56" align="end">
         <DropdownMenuLabel>{user.displayName}</DropdownMenuLabel>
         <DropdownMenuSeparator />
-        {(role === 'ADMIN' || role === 'SUPER_ADMIN') && (
+        {role === 'SUPER_ADMIN' && (
             <DropdownMenuItem asChild>
                 <Link href="/admin">
                     <Shield className="mr-2 h-4 w-4" />
