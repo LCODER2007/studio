@@ -35,9 +35,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Suggestion, SuggestionCategories } from "@/lib/types";
 import { useAuth } from "../auth/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { PlaceHolderImages } from "@/lib/placeholder-images";
-
-const findImage = (id: string) => PlaceHolderImages.find(img => img.id === id)?.imageUrl || '';
+import { serverTimestamp } from "firebase/firestore";
 
 const formSchema = z.object({
   title: z.string().min(10, "Title must be at least 10 characters.").max(100, "Title cannot exceed 100 characters."),
@@ -83,9 +81,9 @@ export function SubmitSuggestionDialog({ open, onOpenChange, onSubmit }: SubmitS
       category: values.category,
       authorUid: values.isAnonymous ? 'ANONYMOUS' : user.uid,
       authorDisplayName: values.isAnonymous ? 'Anonymous' : user.displayName || 'User',
-      authorPhotoURL: values.isAnonymous ? findImage('anonymous-avatar') : user.photoURL,
+      authorPhotoURL: values.isAnonymous ? 'https://picsum.photos/seed/anonymous-avatar/100/100' : user.photoURL,
       status: 'SUBMITTED',
-      submissionTimestamp: new Date(),
+      submissionTimestamp: serverTimestamp(),
       impactScore: 0,
       feasibilityRating: 0,
       costEffectivenessRating: 0,
