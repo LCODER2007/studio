@@ -3,14 +3,14 @@ import type { Suggestion, UserProfile } from './types';
 
 const findImage = (id: string) => PlaceHolderImages.find(img => img.id === id)?.imageUrl || '';
 
-export const mockUsers: Record<string, Omit<UserProfile, 'role'>> = {
-  'user-1': { uid: 'user-1', email: 'jane.doe@example.com', displayName: 'Jane Doe', photoURL: findImage('user-avatar-1') },
-  'user-2': { uid: 'user-2', email: 'peter.jones@example.com', displayName: 'Peter Jones', photoURL: findImage('user-avatar-2') },
-  'user-3': { uid: 'user-3', email: 'susan.smith@example.com', displayName: 'Susan Smith', photoURL: findImage('user-avatar-3') },
-  'student123': { uid: 'student123', email: 'student@unilag.edu', displayName: 'John Student', photoURL: findImage('student-avatar') },
-  'admin456': { uid: 'admin456', email: 'sees-admin@unilag.edu', displayName: 'Admin E. Xecutive', photoURL: findImage('admin-avatar') },
-  'superadmin789': { uid: 'superadmin789', email: 'super@unilag.edu', displayName: 'Super Admin', photoURL: findImage('superadmin-avatar') },
+export const mockUsers: Record<string, UserProfile> = {
+  'user-1': { uid: 'user-1', email: 'jane.doe@example.com', displayName: 'Jane Doe', photoURL: findImage('user-avatar-1'), role: 'STUDENT' },
+  'user-2': { uid: 'user-2', email: 'peter.jones@example.com', displayName: 'Peter Jones', photoURL: findImage('user-avatar-2'), role: 'STUDENT' },
+  'user-3': { uid: 'user-3', email: 'susan.smith@example.com', displayName: 'Susan Smith', photoURL: findImage('user-avatar-3'), role: 'STUDENT' },
+  'student123': { uid: 'student123', email: 'student@unilag.edu', displayName: 'John Student', photoURL: findImage('student-avatar'), role: 'STUDENT' },
+  'superadmin789': { uid: 'superadmin789', email: 'super@unilag.edu', displayName: 'Super Admin', photoURL: findImage('superadmin-avatar'), role: 'SUPER_ADMIN' },
 };
+
 
 export const mockSuggestions: Suggestion[] = [
   {
