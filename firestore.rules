@@ -11,7 +11,9 @@ service cloud.firestore {
       function isOwner() {
         return request.auth.uid == userId;
       }
-      allow read, write: if isSignedIn() && isOwner();
+      // Allow any signed-in user to read profiles, but only the owner to write.
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && isOwner();
     }
 
     match /suggestions/{suggestionId} {
