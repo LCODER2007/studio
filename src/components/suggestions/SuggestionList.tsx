@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useMemo, useCallback } from "react";
@@ -40,7 +41,7 @@ export default function SuggestionList() {
 
   const userVotesQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
-    return collection(firestore, 'user_votes', user.uid, 'suggestions');
+    return collection(firestore, `users/${user.uid}/user_votes`);
   }, [firestore, user]);
 
   const { data: userVotes } = useCollection(userVotesQuery);
@@ -77,20 +78,19 @@ export default function SuggestionList() {
     }
 
     const suggestionRef = doc(firestore, "suggestions", suggestionId);
-    const userVoteRef = doc(firestore, "user_votes", user.uid, "suggestions", suggestionId);
+    const userVoteRef = doc(firestore, "users", user.uid, "user_votes", suggestionId);
 
     try {
       await runTransaction(firestore, async (transaction) => {
         const userVoteSnap = await transaction.get(userVoteRef);
 
         if (userVoteSnap.exists()) {
-          // This throw will be caught by the catch block below.
           throw new Error("Already upvoted");
         }
 
         const suggestionSnap = await transaction.get(suggestionRef);
         if (!suggestionSnap.exists()) {
-          throw "Suggestion does not exist!";
+          throw new Error("Suggestion does not exist!");
         }
 
         const newUpvotesCount = (suggestionSnap.data().upvotesCount || 0) + 1;
@@ -104,7 +104,7 @@ export default function SuggestionList() {
       });
 
     } catch (e: any) {
-      console.error("Upvote transaction failed: ", e);
+      console.error("Upvote transaction failed: ", e.message);
       if (e.message === "Already upvoted") {
         toast({
           variant: "destructive",

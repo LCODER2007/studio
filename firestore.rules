@@ -1,3 +1,4 @@
+
 /**
  * @file Firestore Security Rules
  * @core_philosophy This ruleset enforces a user-ownership model for user data,
@@ -12,28 +13,15 @@
  *     and authored by a user.
  *   /roles_admin/{uid}: Indicates admin privileges for a user; the existence of a
  *     document with a user's UID grants admin rights.
- * @key_security_decisions
- *   - User listing is disabled to protect user privacy.
- *   - Suggestions are publicly readable to encourage participation.
- *   - Admin roles are managed via a dedicated collection for efficient checks.
- *   - All write operations require authentication.
- * @denormalization_for_authorization
- *   - The suggestions documents contains `authorUid` to determine owner.
- * @structural_segregation
- *   - Admin roles are stored in a separate collection (/roles_admin/{uid}) to
- *     simplify admin privilege checks.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Enforces user-ownership for user profiles.
+     * @description Enforces user-ownership for user profiles. Also contains
+     *   a subcollection for user-specific votes.
      * @path /users/{userId}
-     * @allow (create) Authenticated user can create their own profile.
-     * @allow (get, update, delete) Authenticated user can access and modify their own profile.
-     * @deny (create, get, update, delete) Unauthorized access to other user profiles.
-     * @principle Enforces document ownership for writes.
      */
     match /users/{userId} {
       function isSignedIn() {
@@ -42,27 +30,28 @@ service cloud.firestore {
       function isOwner(userId) {
         return request.auth.uid == userId;
       }
-      function isExistingOwner(userId) {
-        return isOwner(userId) && resource != null;
-      }
 
-      allow get: if isSignedIn() && isOwner(userId);
-      allow list: if false;
-      allow create: if isSignedIn() && isOwner(userId) && request.resource.data.uid == request.auth.uid;
-      allow update: if isSignedIn() && isExistingOwner(userId) && request.resource.data.uid == request.auth.uid;
-      allow delete: if isSignedIn() && isExistingOwner(userId);
+      // Allow owner to read/write their own profile
+      allow read, write: if isSignedIn() && isOwner(userId);
+      
+      /**
+       * @description Rules for the user_votes subcollection.
+       * @path /users/{userId}/user_votes/{suggestionId}
+       */
+      match /user_votes/{suggestionId} {
+        // Allow owner to read their own votes.
+        // Allow owner to create a vote (used in transaction).
+        allow read, create: if isSignedIn() && isOwner(userId);
+        allow list: if isSignedIn() && isOwner(userId);
+        // Prevent updates/deletes to maintain vote integrity.
+        allow update, delete: if false;
+      }
     }
 
     /**
      * @description Allows public read access to suggestions and restricts write
      *   access to the owner or an admin.
      * @path /suggestions/{suggestionId}
-     * @allow (get, list) Publicly readable.
-     * @allow (create) Authenticated user can create a suggestion with their UID as the authorUid.
-     * @allow (update, delete) Only the owner or an admin can update/delete.
-     * @deny (create) Creation fails if authorUid doesn't match the authenticated user.
-     * @deny (update, delete) Non-owners and non-admins cannot modify suggestions.
-     * @principle Public read access with owner-only writes.
      */
     match /suggestions/{suggestionId} {
       function isSignedIn() {
@@ -74,13 +63,11 @@ service cloud.firestore {
       function isAdmin() {
         return exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
       }
-      function isExistingOwner(authorUid) {
-        return isOwner(authorUid) && resource != null;
-      }
 
       allow get, list: if true;
       allow create: if isSignedIn() && request.resource.data.authorUid == request.auth.uid;
-      allow update: if isSignedIn() && (isOwner(resource.data.authorUid) || isAdmin());
+      // Allow update for transaction increments or by owner/admin
+      allow update: if isSignedIn() && (isOwner(resource.data.authorUid) || isAdmin() || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['upvotesCount'])));
       allow delete: if isSignedIn() && (isOwner(resource.data.authorUid) || isAdmin());
     }
 
@@ -88,11 +75,6 @@ service cloud.firestore {
      * @description Enforces access control for comments, allowing creation by
      *   authenticated users and restricting modification to the owner or an admin.
      * @path /comments/{commentId}
-     * @allow (create) Authenticated user can create a comment.
-     * @allow (get) Anyone can get a specific comment, if they know the ID.
-     * @allow (list) No listing allowed, should be handled via subcollection.
-     * @deny (update, delete) Only the owner or an admin can update/delete.
-     * @principle Enforces document ownership for writes.
      */
     match /comments/{commentId} {
       function isSignedIn() {
@@ -104,12 +86,8 @@ service cloud.firestore {
       function isAdmin() {
         return exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
       }
-      function isExistingOwner(authorUid) {
-        return isOwner(authorUid) && resource != null;
-      }
 
-      allow get: if true;
-      allow list: if false;
+      allow get, list: if true;
       allow create: if isSignedIn() && request.resource.data.authorUid == request.auth.uid;
       allow update: if isSignedIn() && (resource.data.authorUid == request.auth.uid || isAdmin());
       allow delete: if isSignedIn() && (resource.data.authorUid == request.auth.uid || isAdmin());
@@ -119,46 +97,13 @@ service cloud.firestore {
      * @description Grants admin privileges based on the existence of a document
      *   in this collection.
      * @path /roles_admin/{uid}
-     * @allow (create) Only a super admin can create an admin role.
-     * @allow (get) Anyone can check if a user is an admin.
-     * @deny (update, delete) Admin roles can only be managed by a super admin.
-     * @principle Role-based access control.
      */
     match /roles_admin/{uid} {
       function isSuperAdmin() {
-        // In a real application, you'd likely have a more robust way to manage super admins.
-        // For prototyping, you might hardcode a specific UID or check for a specific claim
-        // in the user's JWT.
         return false; // Placeholder: Replace with your super admin check.
       }
-
       allow get: if true;
-      allow list: if false;
-      allow create: if isSuperAdmin();
-      allow update: if false;
-      allow delete: if isSuperAdmin();
+      allow list, create, update, delete: if isSuperAdmin();
     }
-
-        /**
-         * @description Restricts listing suggestions under a specific user's votes to that user.
-         * @path /user_votes/{userId}/suggestions
-         * @allow (get) Authenticated user can check if they have voted on a specific suggestion.
-         * @allow (list) Authenticated user can list suggestions under their own votes.
-         * @deny (list) Unauthorized access to other user's vote suggestions.
-         * @principle Enforces document ownership for listing user-specific data.
-         */
-        match /user_votes/{userId}/suggestions/{suggestionId} {
-          function isSignedIn() {
-            return request.auth != null;
-          }
-
-          function isOwner(userId) {
-            return request.auth.uid == userId;
-          }
-
-          allow get: if isSignedIn() && isOwner(userId);
-          allow list: if isSignedIn() && isOwner(userId);
-          allow create, update, delete: if false;
-        }
   }
 }
