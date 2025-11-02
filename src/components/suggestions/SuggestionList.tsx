@@ -76,7 +76,14 @@ export default function SuggestionList() {
   }, []);
 
   const handleUpvote = useCallback((suggestionId: string) => {
-    if (!firestore || !user) return;
+    if (!firestore || !user) {
+        toast({
+            variant: "destructive",
+            title: "Authentication Required",
+            description: "Please log in to upvote.",
+        });
+        return;
+    }
     
     if (upvotedIds.has(suggestionId)) {
         toast({
@@ -88,6 +95,7 @@ export default function SuggestionList() {
     }
 
     // Create a reference to a new document in the 'votes' collection.
+    // This will trigger the `triggerVoteUpdate` Cloud Function.
     const voteRef = doc(collection(firestore, 'votes'));
     
     addDocumentNonBlocking(voteRef, {
