@@ -41,7 +41,6 @@ export default function SuggestionList() {
 
   const userVotesQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
-    // Note: The collection path is now correct and specific to the logged-in user.
     return collection(firestore, `users/${user.uid}/user_votes`);
   }, [firestore, user]);
 
@@ -79,7 +78,6 @@ export default function SuggestionList() {
     }
 
     const suggestionRef = doc(firestore, "suggestions", suggestionId);
-    // Correctly reference the user's specific vote document for this suggestion.
     const userVoteRef = doc(firestore, "users", user.uid, "user_votes", suggestionId);
 
     try {
@@ -87,7 +85,6 @@ export default function SuggestionList() {
             const userVoteSnap = await transaction.get(userVoteRef);
 
             if (userVoteSnap.exists()) {
-                // This correctly prevents double-voting.
                 throw new Error("Already upvoted");
             }
 
@@ -127,7 +124,6 @@ export default function SuggestionList() {
   const handleSubmitSuggestion = (newSuggestion: Omit<Suggestion, 'suggestionId'>) => {
     if (!firestore) return;
     const suggestionRef = doc(collection(firestore, 'suggestions'));
-    // The new suggestion object includes the real Firestore document ID.
     const fullSuggestion: Suggestion = {
       ...newSuggestion,
       suggestionId: suggestionRef.id,
@@ -137,7 +133,6 @@ export default function SuggestionList() {
   
   const suggestions = useMemo(() => {
     if (!suggestionsData) return [];
-    // Ensure every suggestion object uses the canonical Firestore ID.
     return suggestionsData.map(s => ({ ...s, suggestionId: s.id }));
   }, [suggestionsData]);
   
