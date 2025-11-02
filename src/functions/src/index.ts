@@ -35,29 +35,6 @@ export const triggerVoteUpdate = functions.firestore
     });
   });
 
-/**
- * Triggered when a new document is created in the `comments` collection.
- * It atomically increments the `commentsCount` on the corresponding suggestion.
- */
-export const triggerCommentUpdate = functions.firestore
-  .document("comments/{commentId}")
-  .onCreate(async (snap) => {
-    const comment = snap.data();
-    const { suggestionId } = comment;
-
-    if (!suggestionId) {
-      console.error("Comment is missing suggestionId:", snap.id);
-      return null;
-    }
-
-    const suggestionRef = admin.firestore().collection("suggestions").doc(suggestionId);
-    
-    // Atomically increment the comments count
-    return suggestionRef.update({
-        commentsCount: admin.firestore.FieldValue.increment(1),
-    });
-});
-
 
 /**
  * Triggered when a suggestion's status is updated to 'SHORTLISTED' or 'IMPLEMENTED'.

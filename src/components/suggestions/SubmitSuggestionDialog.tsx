@@ -1,3 +1,4 @@
+
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -85,7 +86,6 @@ export function SubmitSuggestionDialog({ open, onOpenChange, onSubmit }: SubmitS
       status: 'SUBMITTED',
       submissionTimestamp: serverTimestamp(),
       upvotesCount: 0,
-      commentsCount: 0,
       impactScore: 0,
       feasibilityRating: 0,
       costEffectivenessRating: 0,

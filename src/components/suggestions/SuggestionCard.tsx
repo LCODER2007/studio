@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { Suggestion } from "@/lib/types";
@@ -11,7 +12,7 @@ import {
 } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { ArrowUp, MessageSquare } from "lucide-react";
+import { ArrowUp } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
@@ -38,7 +39,7 @@ export default function SuggestionCard({ suggestion, onUpvote, hasUpvoted }: Sug
   const { user } = useAuth();
   
   const handleUpvoteClick = () => {
-    if (user && !hasUpvoted) {
+    if (user) {
       onUpvote(suggestion.suggestionId);
     }
   };
@@ -106,9 +107,8 @@ export default function SuggestionCard({ suggestion, onUpvote, hasUpvoted }: Sug
             {suggestion.upvotesCount}
           </span>
         </Button>
-        <Link href={suggestionLink} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary">
-          <MessageSquare className="h-4 w-4" />
-          <span>{suggestion.commentsCount || 0}</span>
+        <Link href={suggestionLink} className="text-sm text-primary hover:underline">
+          View Details
         </Link>
       </CardFooter>
     </Card>

@@ -47,10 +47,6 @@
           "type": "number",
           "description": "Number of upvotes for the suggestion."
         },
-        "commentsCount": {
-          "type": "number",
-          "description": "Number of comments for the suggestion."
-        },
         "impactScore": {
           "type": "number",
           "description": "Impact score of the suggestion (1-5, admin rated)."
@@ -86,7 +82,6 @@
         "category",
         "status",
         "upvotesCount",
-        "commentsCount",
         "submissionTimestamp"
       ]
     },
@@ -162,50 +157,6 @@
           }
       },
       "required": ["suggestionId"]
-    },
-    "Comment": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Comment",
-      "type": "object",
-      "description": "Represents a comment on a suggestion.",
-      "properties": {
-        "commentId": {
-          "type": "string",
-          "description": "Unique identifier for the comment entity."
-        },
-        "suggestionId": {
-          "type": "string",
-          "description": "Reference to the Suggestion the comment belongs to. (Relationship: Suggestion 1:N Comment)"
-        },
-        "authorUid": {
-          "type": "string",
-          "description": "Reference to the User who wrote the comment. (Relationship: User 1:N Comment)"
-        },
-        "authorDisplayName": {
-            "type": "string",
-            "description": "Display name of the user who wrote the comment."
-        },
-        "authorPhotoURL": {
-            "type": "string",
-            "description": "Photo URL of the user who wrote the comment."
-        },
-        "body": {
-          "type": "string",
-          "description": "Content of the comment."
-        },
-        "timestamp": {
-          "type": "string",
-          "description": "Timestamp of when the comment was posted.",
-          "format": "date-time"
-        }
-      },
-      "required": [
-        "commentId",
-        "suggestionId",
-        "authorUid",
-        "body",
-        "timestamp"
-      ]
     }
   },
   "auth": {
@@ -280,22 +231,6 @@
             {
                 "name": "suggestionId",
                 "description": "The unique identifier of the suggestion."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/comments/{commentId}",
-        "definition": {
-          "entityName": "Comment",
-          "schema": {
-            "$ref": "#/backend/entities/Comment"
-          },
-          "description": "Stores comments on suggestions. Each comment is associated with a specific suggestion via the suggestionId field.",
-          "params": [
-            {
-              "name": "commentId",
-              "description": "The unique identifier of the comment."
             }
           ]
         }
