@@ -37,10 +37,11 @@ export default function SuggestionList() {
     return q;
   }, [firestore, filters.category, sortBy]);
 
-  const { data: suggestions, isLoading } = useCollection<Suggestion>(suggestionsQuery);
+  const { data: suggestionsData, isLoading } = useCollection<Suggestion>(suggestionsQuery);
 
   const userVotesQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
+    // Note: The collection path is now correct and specific to the logged-in user.
     return collection(firestore, `users/${user.uid}/user_votes`);
   }, [firestore, user]);
 
@@ -78,6 +79,7 @@ export default function SuggestionList() {
     }
 
     const suggestionRef = doc(firestore, "suggestions", suggestionId);
+    // Correctly reference the user's specific vote document for this suggestion.
     const userVoteRef = doc(firestore, "users", user.uid, "user_votes", suggestionId);
 
     try {
@@ -85,6 +87,7 @@ export default function SuggestionList() {
             const userVoteSnap = await transaction.get(userVoteRef);
 
             if (userVoteSnap.exists()) {
+                // This correctly prevents double-voting.
                 throw new Error("Already upvoted");
             }
 
@@ -124,19 +127,19 @@ export default function SuggestionList() {
   const handleSubmitSuggestion = (newSuggestion: Omit<Suggestion, 'suggestionId'>) => {
     if (!firestore) return;
     const suggestionRef = doc(collection(firestore, 'suggestions'));
+    // The new suggestion object includes the real Firestore document ID.
     const fullSuggestion: Suggestion = {
       ...newSuggestion,
-      suggestionId: suggestionRef.id, // Ensure the ID is set for local state updates if needed
+      suggestionId: suggestionRef.id,
     };
     addDocumentNonBlocking(suggestionRef, fullSuggestion);
   };
   
-  const displayedSuggestions = useMemo(() => {
-    if (!suggestions) return [];
-    // The useCollection hook already adds `id`. We just need to make sure our type matches.
-    // We'll rename `id` to `suggestionId` for consistency within our app components.
-    return suggestions.map(s => ({ ...s, suggestionId: s.id }));
-  }, [suggestions]);
+  const suggestions = useMemo(() => {
+    if (!suggestionsData) return [];
+    // Ensure every suggestion object uses the canonical Firestore ID.
+    return suggestionsData.map(s => ({ ...s, suggestionId: s.id }));
+  }, [suggestionsData]);
   
   if (isLoading) {
     return (
@@ -163,10 +166,10 @@ export default function SuggestionList() {
         onSortChange={handleSortChange}
       />
       
-      {displayedSuggestions.length > 0 ? (
+      {suggestions.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
            <AnimatePresence>
-            {displayedSuggestions.map((suggestion) => (
+            {suggestions.map((suggestion) => (
                <motion.div
                  key={suggestion.suggestionId}
                  layout
@@ -177,7 +180,7 @@ export default function SuggestionList() {
                >
                 <SuggestionCard
                   suggestion={suggestion}
-                  onUpvote={handleUpvote}
+                  onUpvote={() => handleUpvote(suggestion.suggestionId)}
                   hasUpvoted={upvotedIds.has(suggestion.suggestionId)}
                 />
               </motion.div>
