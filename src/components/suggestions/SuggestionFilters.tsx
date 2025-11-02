@@ -10,7 +10,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { SuggestionStatuses, SuggestionStatus } from "@/lib/types";
 import { PlusCircle, Search, SortAsc } from "lucide-react";
 
 type SortOption = "upvotesCount" | "submissionTimestamp";
@@ -18,18 +17,14 @@ type SortOption = "upvotesCount" | "submissionTimestamp";
 interface SuggestionFiltersProps {
   onOpenSubmitDialog: () => void;
   onSortChange: (value: SortOption) => void;
-  onStatusChange: (value: SuggestionStatus | "ALL") => void;
   onSearchChange: (value: string) => void;
-  currentStatus: SuggestionStatus | "ALL";
   currentSearch: string;
 }
 
 export default function SuggestionFilters({ 
     onOpenSubmitDialog, 
     onSortChange, 
-    onStatusChange, 
     onSearchChange,
-    currentStatus,
     currentSearch 
 }: SuggestionFiltersProps) {
   return (
@@ -45,17 +40,6 @@ export default function SuggestionFilters({
           />
       </div>
       <div className="flex-grow flex flex-col sm:flex-row gap-4">
-        <Select defaultValue="ALL" onValueChange={onStatusChange} value={currentStatus}>
-            <SelectTrigger className="w-full sm:w-[180px]">
-                <SelectValue placeholder="Filter by status" />
-            </SelectTrigger>
-            <SelectContent>
-                <SelectItem value="ALL">All Statuses</SelectItem>
-                {SuggestionStatuses.map(status => (
-                    <SelectItem key={status} value={status} className="capitalize">{status.replace(/_/g, " ").toLowerCase()}</SelectItem>
-                ))}
-            </SelectContent>
-        </Select>
         <div className="relative w-full sm:w-auto flex-grow">
             <SortAsc className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Select defaultValue="submissionTimestamp" onValueChange={(value) => onSortChange(value as SortOption)}>

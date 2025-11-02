@@ -1,3 +1,4 @@
+
 "use client";
 
 import {
@@ -21,7 +22,7 @@ export function ResourceAllocation({ suggestions }: ResourceAllocationProps) {
     <Card>
         <CardHeader>
             <CardTitle>Resource Allocation</CardTitle>
-            <CardDescription>Overview of resources allocated to implemented suggestions.</CardDescription>
+            <CardDescription>Overview of resources allocated to all suggestions.</CardDescription>
         </CardHeader>
         <CardContent>
             <Table>
@@ -36,7 +37,7 @@ export function ResourceAllocation({ suggestions }: ResourceAllocationProps) {
                     {suggestions.length === 0 && (
                         <TableRow>
                             <TableCell colSpan={3} className="text-center h-24">
-                                No implemented suggestions yet.
+                                No suggestions yet.
                             </TableCell>
                         </TableRow>
                     )}

@@ -38,18 +38,9 @@
           "description": "Category of the suggestion (ACADEMIC_CURRICULUM, INFRASTRUCTURE_IT, TECHNICAL_DESIGN, ENVIRONMENTAL_SUSTAINABILITY, ADMINISTRATIVE_SEES, OTHER).",
           "format": "string"
         },
-        "status": {
-          "type": "string",
-          "description": "Status of the suggestion (SUBMITTED, UNDER_REVIEW, SHORTLISTED, ARCHIVED_REJECTED, IMPLEMENTED).",
-          "format": "string"
-        },
         "upvotesCount": {
           "type": "number",
           "description": "Number of upvotes for the suggestion."
-        },
-        "commentsCount": {
-            "type": "number",
-            "description": "Number of comments on the suggestion."
         },
         "impactScore": {
           "type": "number",
@@ -84,9 +75,7 @@
         "authorUid",
         "authorDisplayName",
         "category",
-        "status",
         "upvotesCount",
-        "commentsCount",
         "submissionTimestamp"
       ]
     },

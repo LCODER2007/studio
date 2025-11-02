@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from 'react';
@@ -5,7 +6,7 @@ import type { Suggestion } from '@/lib/types';
 import AdminSuggestionTable from './AdminSuggestionTable';
 import { EditSuggestionSheet } from './EditSuggestionSheet';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, doc, query, where, orderBy, Query, DocumentData } from 'firebase/firestore';
+import { collection, doc, query, orderBy } from 'firebase/firestore';
 import { updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 
 export default function AdminDashboard() {
@@ -14,7 +15,7 @@ export default function AdminDashboard() {
   
   const suggestionsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
-    return query(collection(firestore, 'suggestions'), where('status', '==', 'SUBMITTED'), orderBy('submissionTimestamp', 'desc'));
+    return query(collection(firestore, 'suggestions'), orderBy('submissionTimestamp', 'desc'));
   }, [firestore]);
 
   const { data: suggestions, isLoading } = useCollection<Suggestion>(suggestionsQuery);

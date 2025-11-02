@@ -27,14 +27,6 @@ interface SuggestionCardProps {
   hasUpvoted: boolean;
 }
 
-const statusColorMap: Record<Suggestion["status"], string> = {
-  SUBMITTED: "bg-blue-100 text-blue-800",
-  UNDER_REVIEW: "bg-yellow-100 text-yellow-800",
-  SHORTLISTED: "bg-green-100 text-green-800",
-  IMPLEMENTED: "bg-purple-100 text-purple-800",
-  ARCHIVED_REJECTED: "bg-gray-100 text-gray-800",
-};
-
 export default function SuggestionCard({ suggestion, onUpvote, hasUpvoted }: SuggestionCardProps) {
   const { user } = useAuth();
   
@@ -55,9 +47,6 @@ export default function SuggestionCard({ suggestion, onUpvote, hasUpvoted }: Sug
       <CardHeader>
         <div className="flex justify-between items-start gap-4">
           <div>
-            <Badge variant="outline" className={cn("capitalize", statusColorMap[suggestion.status])}>
-              {suggestion.status.replace(/_/g, " ").toLowerCase()}
-            </Badge>
             <CardTitle className="mt-2 text-lg">
                 <Link href={suggestionLink} className="hover:underline">
                     {suggestion.title}

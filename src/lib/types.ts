@@ -20,15 +20,6 @@ export const SuggestionCategories = [
 ] as const;
 export type SuggestionCategory = (typeof SuggestionCategories)[number];
 
-export const SuggestionStatuses = [
-  'SUBMITTED',
-  'UNDER_REVIEW',
-  'SHORTLISTED',
-  'ARCHIVED_REJECTED',
-  'IMPLEMENTED',
-] as const;
-export type SuggestionStatus = (typeof SuggestionStatuses)[number];
-
 export interface Suggestion {
   suggestionId: string; // This will be the Firestore document ID
   title: string;
@@ -37,9 +28,7 @@ export interface Suggestion {
   authorDisplayName: string; // "Anonymous" or user display name
   authorPhotoURL?: string | null;
   category: SuggestionCategory;
-  status: SuggestionStatus;
   upvotesCount: number;
-  commentsCount: number;
   impactScore: number; // 1-5
   feasibilityRating: number; // 1-5
   costEffectivenessRating: number; // 1-5

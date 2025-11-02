@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -51,11 +52,6 @@ export default function AdminSuggestionTable({ suggestions, onEdit }: AdminSugge
       accessorKey: "category",
       header: "Category",
       cell: ({ row }) => <div className="capitalize">{`${row.getValue("category")}`.replace(/_/g, " ").toLowerCase()}</div>,
-    },
-    {
-      accessorKey: "status",
-      header: "Status",
-      cell: ({ row }) => <Badge variant="outline">{row.getValue("status")}</Badge>,
     },
     {
         accessorKey: "submissionTimestamp",
