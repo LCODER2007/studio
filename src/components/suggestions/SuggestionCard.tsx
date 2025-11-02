@@ -52,48 +52,50 @@ export default function SuggestionCard({ suggestion, onUpvote, hasUpvoted }: Sug
 
   return (
     <Card className="flex flex-col h-full transition-all hover:shadow-md">
-      <Link href={suggestionLink} className="flex flex-col flex-grow">
-        <CardHeader>
-          <div className="flex justify-between items-start gap-4">
-            <div>
-              <Badge variant="outline" className={cn("capitalize", statusColorMap[suggestion.status])}>
-                {suggestion.status.replace(/_/g, " ").toLowerCase()}
-              </Badge>
-              <CardTitle className="mt-2 text-lg">{suggestion.title}</CardTitle>
-            </div>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="p-2 rounded-full bg-muted cursor-pointer">
-                    <CategoryIcon category={suggestion.category} className="w-5 h-5 text-muted-foreground" />
-                </div>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p className="capitalize">{suggestion.category.replace(/_/g, " ").toLowerCase()}</p>
-              </TooltipContent>
-            </Tooltip>
+      <CardHeader>
+        <div className="flex justify-between items-start gap-4">
+          <div>
+            <Badge variant="outline" className={cn("capitalize", statusColorMap[suggestion.status])}>
+              {suggestion.status.replace(/_/g, " ").toLowerCase()}
+            </Badge>
+            <CardTitle className="mt-2 text-lg">
+                <Link href={suggestionLink} className="hover:underline">
+                    {suggestion.title}
+                </Link>
+            </CardTitle>
           </div>
-          <CardDescription>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground pt-2">
-              <Link href={`/profile/${suggestion.authorUid}`} onClick={(e) => e.stopPropagation()} className="flex items-center gap-2 hover:underline">
-                <Avatar className="h-5 w-5">
-                  <AvatarImage src={suggestion.authorPhotoURL ?? ""} />
-                  <AvatarFallback>{suggestion.authorDisplayName?.charAt(0)}</AvatarFallback>
-                </Avatar>
-                <span>{suggestion.authorDisplayName}</span>
-              </Link>
-              <span>&bull;</span>
-              <span>
-                {submissionDate ? formatDistanceToNow(submissionDate, { addSuffix: true }) : 'just now'}
-              </span>
-            </div>
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex-grow">
-          <p className="text-sm text-muted-foreground line-clamp-3">
-            {suggestion.body}
-          </p>
-        </CardContent>
-      </Link>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="p-2 rounded-full bg-muted cursor-pointer">
+                  <CategoryIcon category={suggestion.category} className="w-5 h-5 text-muted-foreground" />
+              </div>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p className="capitalize">{suggestion.category.replace(/_/g, " ").toLowerCase()}</p>
+            </TooltipContent>
+          </Tooltip>
+        </div>
+        <CardDescription>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground pt-2">
+            <Link href={`/profile/${suggestion.authorUid}`} className="flex items-center gap-2 hover:underline">
+              <Avatar className="h-5 w-5">
+                <AvatarImage src={suggestion.authorPhotoURL ?? ""} />
+                <AvatarFallback>{suggestion.authorDisplayName?.charAt(0)}</AvatarFallback>
+              </Avatar>
+              <span>{suggestion.authorDisplayName}</span>
+            </Link>
+            <span>&bull;</span>
+            <span>
+              {submissionDate ? formatDistanceToNow(submissionDate, { addSuffix: true }) : 'just now'}
+            </span>
+          </div>
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex-grow">
+        <p className="text-sm text-muted-foreground line-clamp-3">
+          {suggestion.body}
+        </p>
+      </CardContent>
       <CardFooter className="flex justify-between items-center border-t pt-4">
         <div className="flex items-center gap-4">
           <Button
@@ -110,10 +112,6 @@ export default function SuggestionCard({ suggestion, onUpvote, hasUpvoted }: Sug
               {suggestion.upvotesCount}
             </span>
           </Button>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <MessageSquare className="w-4 h-4" />
-            <span>{suggestion.commentsCount || 0}</span>
-          </div>
         </div>
         <Link href={suggestionLink} className="text-sm text-primary hover:underline">
           View Details
