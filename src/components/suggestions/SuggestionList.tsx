@@ -9,8 +9,7 @@ import { SubmitSuggestionDialog } from "./SubmitSuggestionDialog";
 import { useAuth } from "../auth/AuthContext";
 import { AnimatePresence, motion } from "framer-motion";
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
-import { addDocumentNonBlocking } from "@/firebase/non-blocking-updates";
-import { collection, doc, serverTimestamp, query, where, orderBy, Query, DocumentData, runTransaction } from "firebase/firestore";
+import { addDoc, collection, doc, serverTimestamp, query, where, orderBy, Query, DocumentData, runTransaction } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 
 type SortOption = "upvotesCount" | "submissionTimestamp";
@@ -121,18 +120,31 @@ export default function SuggestionList() {
     }
   }, [firestore, user, toast]);
 
-  const handleSubmitSuggestion = (newSuggestion: Omit<Suggestion, 'suggestionId'>) => {
+  const handleSubmitSuggestion = async (newSuggestion: Omit<Suggestion, 'suggestionId'>) => {
     if (!firestore) return;
-    const suggestionRef = doc(collection(firestore, 'suggestions'));
-    const fullSuggestion: Suggestion = {
-      ...newSuggestion,
-      suggestionId: suggestionRef.id,
-    };
-    addDocumentNonBlocking(suggestionRef, fullSuggestion);
-  };
+    const suggestionsCollectionRef = collection(firestore, 'suggestions');
+    try {
+        const docRef = await addDoc(suggestionsCollectionRef, {
+            ...newSuggestion,
+            suggestionId: 'placeholder' // This will be overwritten by the document ID
+        });
+        // Now update the document with its own ID
+        await runTransaction(firestore, async (transaction) => {
+            transaction.update(docRef, { suggestionId: docRef.id });
+        });
+    } catch (error) {
+        console.error("Error adding suggestion: ", error);
+        toast({
+            variant: "destructive",
+            title: "Submission Failed",
+            description: "Could not save your suggestion. Please try again.",
+        });
+    }
+};
   
   const suggestions = useMemo(() => {
     if (!suggestionsData) return [];
+    // Ensure suggestionId is the document id
     return suggestionsData.map(s => ({ ...s, suggestionId: s.id }));
   }, [suggestionsData]);
   
