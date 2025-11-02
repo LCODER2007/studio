@@ -1,4 +1,8 @@
 
+// ACTION REQUIRED: To enable filtering by category, you must create a composite index.
+// Click the link below and then click "Create Index" in the Firebase Console.
+// https://console.firebase.google.com/project/studio-2819594368-36cb9/firestore/indexes/composite/new?collectionId=suggestions&fields=category,ASCENDING,submissionTimestamp,DESCENDING&fields=category,ASCENDING,upvotesCount,DESCENDING
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -28,21 +32,13 @@ service cloud.firestore {
       allow delete: if isSignedIn() && (request.auth.uid == resource.data.authorUid || isAdmin());
     }
     
-    match /comments/{commentId} {
-      allow read: if true;
-      allow create: if isSignedIn() && request.resource.data.authorUid == request.auth.uid;
-      allow update, delete: if isSignedIn() && request.auth.uid == resource.data.authorUid;
-    }
-
     // Rules for the user-specific voting records.
     match /users/{userId}/user_votes/{suggestionId} {
        function isOwner() {
         return request.auth.uid == userId;
       }
       // Allow a user to check their own votes for the transaction.
-      allow get: if isSignedIn() && isOwner(); 
-      // Allow a user to create a vote document for themselves.
-      allow create: if isSignedIn() && isOwner();
+      allow get, create: if isSignedIn() && isOwner(); 
       // Allow a user to read their own votes for the UI.
       allow list: if isSignedIn() && isOwner();
       // Prevent updates/deletes to maintain vote integrity.
