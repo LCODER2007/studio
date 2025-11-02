@@ -1,8 +1,4 @@
 
-// ACTION REQUIRED: To enable filtering by category, you must create a composite index.
-// Click the link below and then click "Create Index" in the Firebase Console.
-// https://console.firebase.google.com/project/studio-2819594368-36cb9/firestore/indexes/composite/new?collectionId=suggestions&fields=category,ASCENDING,submissionTimestamp,DESCENDING&fields=category,ASCENDING,upvotesCount,DESCENDING
-
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {

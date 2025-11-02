@@ -9,7 +9,7 @@ import { SubmitSuggestionDialog } from "./SubmitSuggestionDialog";
 import { useAuth } from "../auth/AuthContext";
 import { AnimatePresence, motion } from "framer-motion";
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
-import { addDoc, collection, doc, serverTimestamp, query, where, orderBy, Query, DocumentData, runTransaction } from "firebase/firestore";
+import { addDoc, collection, doc, serverTimestamp, query, where, orderBy, Query, DocumentData, runTransaction, updateDoc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 
 type SortOption = "upvotesCount" | "submissionTimestamp";
@@ -19,7 +19,6 @@ export default function SuggestionList() {
   const firestore = useFirestore();
   const { toast } = useToast();
   const [isSubmitDialogOpen, setIsSubmitDialogOpen] = useState(false);
-  const [filters, setFilters] = useState<{ category: string; status: string }>({ category: "all", status: "all" });
   const [sortBy, setSortBy] = useState<SortOption>("submissionTimestamp");
   
   const suggestionsQuery = useMemoFirebase(() => {
@@ -27,14 +26,10 @@ export default function SuggestionList() {
     
     let q: Query<DocumentData> = collection(firestore, 'suggestions');
 
-    if (filters.category !== 'all') {
-      q = query(q, where('category', '==', filters.category));
-    }
-
     q = query(q, orderBy(sortBy, 'desc'));
 
     return q;
-  }, [firestore, filters.category, sortBy]);
+  }, [firestore, sortBy]);
 
   const { data: suggestionsData, isLoading } = useCollection<Suggestion>(suggestionsQuery);
 
@@ -57,10 +52,6 @@ export default function SuggestionList() {
       });
     }
   };
-
-  const handleFilterChange = useCallback((type: 'category' | 'status', value: string) => {
-    setFilters(prev => ({ ...prev, [type]: value }));
-  }, []);
 
   const handleSortChange = useCallback((value: SortOption) => {
     setSortBy(value);
@@ -126,12 +117,9 @@ export default function SuggestionList() {
     try {
         const docRef = await addDoc(suggestionsCollectionRef, {
             ...newSuggestion,
-            suggestionId: 'placeholder' // This will be overwritten by the document ID
         });
         // Now update the document with its own ID
-        await runTransaction(firestore, async (transaction) => {
-            transaction.update(docRef, { suggestionId: docRef.id });
-        });
+        await updateDoc(docRef, { suggestionId: docRef.id });
     } catch (error) {
         console.error("Error adding suggestion: ", error);
         toast({
@@ -153,7 +141,6 @@ export default function SuggestionList() {
         <div>
             <SuggestionFilters
                 onOpenSubmitDialog={handleOpenSubmitDialog}
-                onFilterChange={handleFilterChange}
                 onSortChange={handleSortChange}
             />
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -169,7 +156,6 @@ export default function SuggestionList() {
     <>
       <SuggestionFilters
         onOpenSubmitDialog={handleOpenSubmitDialog}
-        onFilterChange={handleFilterChange}
         onSortChange={handleSortChange}
       />
       
