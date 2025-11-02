@@ -10,6 +10,7 @@ import Header from '@/components/layout/Header';
 import SuggestionDetail from '@/components/suggestions/SuggestionDetail';
 import { useAuth } from '@/components/auth/AuthContext';
 import Link from 'next/link';
+import { Button } from '@/components/ui/button';
 
 export default function SuggestionPage() {
     const { id } = useParams();
@@ -34,6 +35,7 @@ export default function SuggestionPage() {
                     <div className="space-y-4">
                       <div className="w-full h-40 bg-muted rounded-lg animate-pulse"></div>
                       <div className="w-full h-20 bg-muted rounded-lg animate-pulse"></div>
+                      <div className="w-full h-48 bg-muted rounded-lg animate-pulse mt-6"></div>
                     </div>
                 </main>
             </div>
@@ -48,7 +50,9 @@ export default function SuggestionPage() {
                     <div className="text-center py-20 border-2 border-dashed rounded-lg">
                         <h1 className="text-2xl font-bold text-muted-foreground">Suggestion Not Found</h1>
                         <p className="text-muted-foreground mt-2">The suggestion you are looking for does not exist or may have been deleted.</p>
-                        <Link href="/" className="mt-4 inline-block bg-primary text-primary-foreground px-4 py-2 rounded">Go Home</Link>
+                        <Button asChild className="mt-4">
+                            <Link href="/">Go Home</Link>
+                        </Button>
                     </div>
                 </main>
             </div>

@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useMemo, useCallback } from "react";
-import type { Suggestion } from "@/lib/types";
+import type { Suggestion, SuggestionStatus } from "@/lib/types";
 import SuggestionCard from "./SuggestionCard";
 import SuggestionFilters from "./SuggestionFilters";
 import { SubmitSuggestionDialog } from "./SubmitSuggestionDialog";
@@ -20,16 +20,24 @@ export default function SuggestionList() {
   const { toast } = useToast();
   const [isSubmitDialogOpen, setIsSubmitDialogOpen] = useState(false);
   const [sortBy, setSortBy] = useState<SortOption>("submissionTimestamp");
-  
+  const [statusFilter, setStatusFilter] = useState<SuggestionStatus | "ALL">("ALL");
+  const [searchQuery, setSearchQuery] = useState("");
+
   const suggestionsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     
     let q: Query<DocumentData> = collection(firestore, 'suggestions');
 
+    if (statusFilter !== "ALL") {
+      q = query(q, where('status', '==', statusFilter));
+    }
+    
+    // Note: A composite index is required for this query.
+    // The security rules file contains a link to create it.
     q = query(q, orderBy(sortBy, 'desc'));
 
     return q;
-  }, [firestore, sortBy]);
+  }, [firestore, sortBy, statusFilter]);
 
   const { data: suggestionsData, isLoading } = useCollection<Suggestion>(suggestionsQuery);
 
@@ -57,6 +65,15 @@ export default function SuggestionList() {
     setSortBy(value);
   }, []);
 
+  const handleStatusChange = useCallback((value: SuggestionStatus | "ALL") => {
+    setStatusFilter(value);
+  }, []);
+
+  const handleSearchChange = useCallback((value: string) => {
+    setSearchQuery(value);
+  }, []);
+
+
   const handleUpvote = useCallback(async (suggestionId: string) => {
     if (!firestore || !user) {
       toast({
@@ -75,7 +92,14 @@ export default function SuggestionList() {
             const userVoteSnap = await transaction.get(userVoteRef);
 
             if (userVoteSnap.exists()) {
-                throw new Error("Already upvoted");
+                // This toast is for user feedback, not an actual error.
+                toast({
+                    variant: "destructive",
+                    title: "Already Upvoted",
+                    description: "You have already upvoted this suggestion.",
+                });
+                // We return here to stop the transaction from proceeding.
+                return;
             }
 
             const suggestionSnap = await transaction.get(suggestionRef);
@@ -88,20 +112,10 @@ export default function SuggestionList() {
             transaction.set(userVoteRef, { suggestionId: suggestionId, timestamp: serverTimestamp() });
         });
 
-        toast({
-            title: "Upvoted!",
-            description: "Your vote has been successfully counted.",
-        });
-
     } catch (e: any) {
       console.error("Upvote transaction failed: ", e.message);
-      if (e.message === "Already upvoted") {
-        toast({
-          variant: "destructive",
-          title: "Already Upvoted",
-          description: "You have already upvoted this suggestion.",
-        });
-      } else {
+      // We only show a generic error now because specific cases are handled above.
+      if (e.message !== "Already upvoted") {
         toast({
           variant: "destructive",
           title: "Upvote Failed",
@@ -111,12 +125,13 @@ export default function SuggestionList() {
     }
   }, [firestore, user, toast]);
 
-  const handleSubmitSuggestion = async (newSuggestion: Omit<Suggestion, 'suggestionId'>) => {
+  const handleSubmitSuggestion = async (newSuggestion: Omit<Suggestion, 'suggestionId' | 'commentsCount'>) => {
     if (!firestore) return;
     const suggestionsCollectionRef = collection(firestore, 'suggestions');
     try {
         const docRef = await addDoc(suggestionsCollectionRef, {
             ...newSuggestion,
+            commentsCount: 0, // Initialize comments count
         });
         // Now update the document with its own ID
         await updateDoc(docRef, { suggestionId: docRef.id });
@@ -132,9 +147,14 @@ export default function SuggestionList() {
   
   const suggestions = useMemo(() => {
     if (!suggestionsData) return [];
-    // Ensure suggestionId is the document id
-    return suggestionsData.map(s => ({ ...s, suggestionId: s.id }));
-  }, [suggestionsData]);
+    let filteredSuggestions = suggestionsData.map(s => ({ ...s, suggestionId: s.id }));
+    if (searchQuery) {
+        filteredSuggestions = filteredSuggestions.filter(s =>
+            s.title.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+    }
+    return filteredSuggestions;
+  }, [suggestionsData, searchQuery]);
   
   if (isLoading) {
     return (
@@ -142,6 +162,10 @@ export default function SuggestionList() {
             <SuggestionFilters
                 onOpenSubmitDialog={handleOpenSubmitDialog}
                 onSortChange={handleSortChange}
+                onStatusChange={handleStatusChange}
+                onSearchChange={handleSearchChange}
+                currentStatus={statusFilter}
+                currentSearch={searchQuery}
             />
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {[...Array(6)].map((_, i) => (
@@ -157,6 +181,10 @@ export default function SuggestionList() {
       <SuggestionFilters
         onOpenSubmitDialog={handleOpenSubmitDialog}
         onSortChange={handleSortChange}
+        onStatusChange={handleStatusChange}
+        onSearchChange={handleSearchChange}
+        currentStatus={statusFilter}
+        currentSearch={searchQuery}
       />
       
       {suggestions.length > 0 ? (

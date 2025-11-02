@@ -47,6 +47,10 @@
           "type": "number",
           "description": "Number of upvotes for the suggestion."
         },
+        "commentsCount": {
+            "type": "number",
+            "description": "Number of comments on the suggestion."
+        },
         "impactScore": {
           "type": "number",
           "description": "Impact score of the suggestion (1-5, admin rated)."
@@ -82,6 +86,7 @@
         "category",
         "status",
         "upvotesCount",
+        "commentsCount",
         "submissionTimestamp"
       ]
     },
@@ -157,6 +162,51 @@
           }
       },
       "required": ["suggestionId"]
+    },
+     "Comment": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Comment",
+      "type": "object",
+      "description": "Represents a comment on a suggestion.",
+      "properties": {
+        "commentId": {
+          "type": "string",
+          "description": "Unique identifier for the comment entity."
+        },
+        "suggestionId": {
+          "type": "string",
+          "description": "Reference to Suggestion. Unique identifier of the suggestion being commented on."
+        },
+        "authorUid": {
+          "type": "string",
+          "description": "Reference to User. Unique identifier of the user who wrote the comment."
+        },
+        "authorDisplayName": {
+          "type": "string",
+          "description": "Display name of the user who wrote the comment."
+        },
+        "authorPhotoURL": {
+          "type": "string",
+          "description": "Photo URL of the user who wrote the comment."
+        },
+        "body": {
+          "type": "string",
+          "description": "Content of the comment."
+        },
+        "timestamp": {
+          "type": "string",
+          "description": "Timestamp of when the comment was posted.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "commentId",
+        "suggestionId",
+        "authorUid",
+        "authorDisplayName",
+        "body",
+        "timestamp"
+      ]
     }
   },
   "auth": {
@@ -200,23 +250,7 @@
         }
       },
       {
-        "path": "/votes/{voteId}",
-        "definition": {
-          "entityName": "Vote",
-          "schema": {
-            "$ref": "#/backend/entities/Vote"
-          },
-          "description": "Stores user votes for suggestions. Enforces one vote per user per suggestion using a composite key of suggestionId and voterUid. This collection triggers the `triggerVoteUpdate` Cloud Function.",
-          "params": [
-            {
-              "name": "voteId",
-              "description": "The unique identifier of the vote."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/user_votes/{uid}/suggestions/{suggestionId}",
+        "path": "/users/{uid}/user_votes/{suggestionId}",
         "definition": {
           "entityName": "UserVote",
           "schema": {
@@ -234,8 +268,28 @@
             }
           ]
         }
+      },
+      {
+          "path": "/suggestions/{suggestionId}/comments/{commentId}",
+          "definition": {
+              "entityName": "Comment",
+              "schema": {
+                  "$ref": "#/backend/entities/Comment"
+              },
+              "description": "Subcollection storing comments for a specific suggestion. This model ensures that comments are loaded efficiently with the suggestion and simplifies security rules.",
+              "params": [
+                  {
+                      "name": "suggestionId",
+                      "description": "The unique identifier of the parent suggestion."
+                  },
+                  {
+                      "name": "commentId",
+                      "description": "The unique identifier of the comment."
+                  }
+              ]
+          }
       }
     ],
-    "reasoning": "The Firestore data structure is designed to ensure security, scalability, and debuggability, while adhering to Authorization Independence. The core principle is to avoid hierarchical authorization dependencies by denormalizing data and utilizing structural segregation for homogeneous security postures. The structure incorporates explicit state modeling for clarity and predictable schemas.\n\nAuthorization Independence is achieved by storing the 'role' property directly within the `/users/{uid}` document. This eliminates the need for `get()` calls in security rules to determine user roles. For the suggestions, the `authorUid` field is used, allowing for anonymous submissions via the 'ANONYMOUS' string literal. The `suggestions` documents do not depend on any data outside themselves for authorization decisions.\n\nQAPs (Rules are not Filters) are supported by segregating data based on access needs and using membership models. Read access is granted broadly on `/suggestions` as read access is required by all users, including unauthenticated ones. Write/Update access is limited through security rules based on the user's role which is checked by reading the `/users/{uid}` collection. The use of the `/votes` collection ensures that a user can only vote once per suggestion. Each vote document contains both `suggestionId` and `voterUid`, providing a clear link between the suggestion and the user who voted, which is essential for the `triggerVoteUpdate` Cloud Function.\n\nInvariants are maintained through the enforcement of ownership for user-specific data via path-based rules for the `/users/{uid}` collection. Timestamps are automatically generated and are immutable. Data integrity is also ensured through the custom claims mechanism, which is securely set server-side."
+    "reasoning": "The Firestore data structure is designed to ensure security, scalability, and debuggability. The `/users` collection stores profiles with roles for authorization. The `/suggestions` collection is flat for easy querying and public readability. To handle user-specific actions without compromising security, a `/users/{uid}/user_votes` subcollection tracks upvotes, preventing users from manipulating others' votes. Comments are stored in a subcollection under each suggestion (`/suggestions/{suggestionId}/comments`) for efficient retrieval and clear ownership context, simplifying security rules by scoping them to the parent suggestion."
   }
 }

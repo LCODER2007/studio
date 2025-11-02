@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { ArrowUp } from "lucide-react";
+import { ArrowUp, MessageSquare } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
@@ -74,11 +74,13 @@ export default function SuggestionCard({ suggestion, onUpvote, hasUpvoted }: Sug
           </div>
           <CardDescription>
             <div className="flex items-center gap-2 text-xs text-muted-foreground pt-2">
-              <Avatar className="h-5 w-5">
-                <AvatarImage src={suggestion.authorPhotoURL ?? ""} />
-                <AvatarFallback>{suggestion.authorDisplayName?.charAt(0)}</AvatarFallback>
-              </Avatar>
-              <span>{suggestion.authorDisplayName}</span>
+              <Link href={`/profile/${suggestion.authorUid}`} onClick={(e) => e.stopPropagation()} className="flex items-center gap-2 hover:underline">
+                <Avatar className="h-5 w-5">
+                  <AvatarImage src={suggestion.authorPhotoURL ?? ""} />
+                  <AvatarFallback>{suggestion.authorDisplayName?.charAt(0)}</AvatarFallback>
+                </Avatar>
+                <span>{suggestion.authorDisplayName}</span>
+              </Link>
               <span>&bull;</span>
               <span>
                 {submissionDate ? formatDistanceToNow(submissionDate, { addSuffix: true }) : 'just now'}
@@ -93,20 +95,26 @@ export default function SuggestionCard({ suggestion, onUpvote, hasUpvoted }: Sug
         </CardContent>
       </Link>
       <CardFooter className="flex justify-between items-center border-t pt-4">
-        <Button
-          variant={hasUpvoted ? "default" : "outline"}
-          size="sm"
-          onClick={handleUpvoteClick}
-          disabled={!user || hasUpvoted}
-          aria-pressed={hasUpvoted}
-          className="group transition-all duration-300"
-        >
-          <ArrowUp className={cn("mr-2 h-4 w-4", hasUpvoted ? "text-white" : "group-hover:animate-bounce")} />
-          <span>{hasUpvoted ? "Upvoted" : "Upvote"}</span>
-          <span className={cn("ml-2 tabular-nums font-semibold", hasUpvoted && "text-white")}>
-            {suggestion.upvotesCount}
-          </span>
-        </Button>
+        <div className="flex items-center gap-4">
+          <Button
+            variant={hasUpvoted ? "default" : "outline"}
+            size="sm"
+            onClick={handleUpvoteClick}
+            disabled={!user || hasUpvoted}
+            aria-pressed={hasUpvoted}
+            className="group transition-all duration-300"
+          >
+            <ArrowUp className={cn("mr-2 h-4 w-4", hasUpvoted ? "text-white" : "group-hover:animate-bounce")} />
+            <span>{hasUpvoted ? "Upvoted" : "Upvote"}</span>
+            <span className={cn("ml-2 tabular-nums font-semibold", hasUpvoted && "text-white")}>
+              {suggestion.upvotesCount}
+            </span>
+          </Button>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <MessageSquare className="w-4 h-4" />
+            <span>{suggestion.commentsCount || 0}</span>
+          </div>
+        </div>
         <Link href={suggestionLink} className="text-sm text-primary hover:underline">
           View Details
         </Link>

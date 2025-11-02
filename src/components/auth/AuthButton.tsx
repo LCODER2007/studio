@@ -1,3 +1,4 @@
+
 "use client";
 
 import {
@@ -67,6 +68,12 @@ export function AuthButton() {
       <DropdownMenuContent className="w-56" align="end">
         <DropdownMenuLabel>{user.displayName}</DropdownMenuLabel>
         <DropdownMenuSeparator />
+        <DropdownMenuItem asChild>
+            <Link href={`/profile/${user.uid}`}>
+                <User className="mr-2 h-4 w-4" />
+                <span>My Profile</span>
+            </Link>
+        </DropdownMenuItem>
         {role === 'SUPER_ADMIN' && (
             <DropdownMenuItem asChild>
                 <Link href="/admin">

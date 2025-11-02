@@ -1,4 +1,5 @@
 
+
 export type UserRole = 'STUDENT' | 'SUPER_ADMIN';
 
 export interface UserProfile {
@@ -38,10 +39,21 @@ export interface Suggestion {
   category: SuggestionCategory;
   status: SuggestionStatus;
   upvotesCount: number;
+  commentsCount: number;
   impactScore: number; // 1-5
   feasibilityRating: number; // 1-5
   costEffectivenessRating: number; // 1-5
   reviewerUid?: string;
   submissionTimestamp: any; // Can be Date or Firebase Timestamp
   publicFeedback?: string;
+}
+
+export interface Comment {
+    commentId: string;
+    suggestionId: string;
+    authorUid: string;
+    authorDisplayName: string;
+    authorPhotoURL?: string | null;
+    body: string;
+    timestamp: any; // Can be Date or Firebase Timestamp
 }

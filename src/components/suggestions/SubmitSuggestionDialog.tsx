@@ -50,7 +50,7 @@ type FormValues = z.infer<typeof formSchema>;
 interface SubmitSuggestionDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (suggestion: Omit<Suggestion, 'suggestionId'>) => void;
+  onSubmit: (suggestion: Omit<Suggestion, 'suggestionId' | 'commentsCount'>) => void;
 }
 
 export function SubmitSuggestionDialog({ open, onOpenChange, onSubmit }: SubmitSuggestionDialogProps) {
@@ -76,7 +76,7 @@ export function SubmitSuggestionDialog({ open, onOpenChange, onSubmit }: SubmitS
       return;
     }
 
-    const newSuggestion: Omit<Suggestion, 'suggestionId'> = {
+    const newSuggestion: Omit<Suggestion, 'suggestionId' | 'commentsCount'> = {
       title: values.title,
       body: values.body,
       category: values.category,
