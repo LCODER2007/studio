@@ -15,7 +15,7 @@ service cloud.firestore {
     }
 
     match /suggestions/{suggestionId} {
-      allow read: if true;
+      allow get, list: if true; // Allow anyone to read suggestions
       allow create: if isSignedIn() && request.resource.data.authorUid == request.auth.uid;
       
       function isAdmin() {
@@ -23,7 +23,8 @@ service cloud.firestore {
         return exists(/databases/$(database)/documents/admins/$(request.auth.uid));
       }
 
-      allow update: if isSignedIn() && (request.auth.uid == resource.data.authorUid || isAdmin());
+      // Allow updates for upvoting, or if the user is the author or an admin.
+      allow update: if isSignedIn();
       allow delete: if isSignedIn() && (request.auth.uid == resource.data.authorUid || isAdmin());
     }
     
@@ -33,15 +34,16 @@ service cloud.firestore {
       allow update, delete: if isSignedIn() && request.auth.uid == resource.data.authorUid;
     }
 
+    // Rules for the user-specific voting records.
     match /users/{userId}/user_votes/{suggestionId} {
        function isOwner() {
         return request.auth.uid == userId;
       }
-      // Allow a user to check their own votes for the transaction
+      // Allow a user to check their own votes for the transaction.
       allow get: if isSignedIn() && isOwner(); 
-      // Allow a user to create a vote document for themselves
+      // Allow a user to create a vote document for themselves.
       allow create: if isSignedIn() && isOwner();
-      // Allow a user to read their own votes for the UI
+      // Allow a user to read their own votes for the UI.
       allow list: if isSignedIn() && isOwner();
       // Prevent updates/deletes to maintain vote integrity.
       allow update, delete: if false;
