@@ -48,5 +48,16 @@ service cloud.firestore {
       // Prevent updates/deletes to maintain vote integrity.
       allow update, delete: if false;
     }
+
+    // Rules for comments subcollection
+    match /suggestions/{suggestionId}/comments/{commentId} {
+        allow read, list: if true;
+        allow create: if isSignedIn() && request.resource.data.authorUid == request.auth.uid;
+        allow update, delete: if isSignedIn() && (request.resource.data.authorUid == request.auth.uid || isAdmin());
+    }
+
+    function isAdmin() {
+        return exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+    }
   }
 }
