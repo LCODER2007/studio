@@ -49,7 +49,7 @@ type FormValues = z.infer<typeof formSchema>;
 interface SubmitSuggestionDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (suggestion: Omit<Suggestion, 'suggestionId' | 'upvotesCount' | 'commentsCount'>) => void;
+  onSubmit: (suggestion: Omit<Suggestion, 'suggestionId'>) => void;
 }
 
 export function SubmitSuggestionDialog({ open, onOpenChange, onSubmit }: SubmitSuggestionDialogProps) {
@@ -75,7 +75,7 @@ export function SubmitSuggestionDialog({ open, onOpenChange, onSubmit }: SubmitS
       return;
     }
 
-    const newSuggestion: Omit<Suggestion, 'suggestionId' | 'upvotesCount' | 'commentsCount'> = {
+    const newSuggestion: Omit<Suggestion, 'suggestionId'> = {
       title: values.title,
       body: values.body,
       category: values.category,
@@ -84,6 +84,8 @@ export function SubmitSuggestionDialog({ open, onOpenChange, onSubmit }: SubmitS
       authorPhotoURL: values.isAnonymous ? 'https://picsum.photos/seed/anonymous-avatar/100/100' : user.photoURL,
       status: 'SUBMITTED',
       submissionTimestamp: serverTimestamp(),
+      upvotesCount: 0,
+      commentsCount: 0,
       impactScore: 0,
       feasibilityRating: 0,
       costEffectivenessRating: 0,

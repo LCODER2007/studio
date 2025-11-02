@@ -81,28 +81,27 @@ export default function SuggestionList() {
     const userVoteRef = doc(firestore, "users", user.uid, "user_votes", suggestionId);
 
     try {
-      await runTransaction(firestore, async (transaction) => {
-        const userVoteSnap = await transaction.get(userVoteRef);
-        
-        if (userVoteSnap.exists()) {
-          // This check is mostly for safety; the UI should already prevent this.
-          throw new Error("Already upvoted");
-        }
-        
-        const suggestionSnap = await transaction.get(suggestionRef);
-        if (!suggestionSnap.exists()) {
-          throw new Error("Suggestion does not exist!");
-        }
+        await runTransaction(firestore, async (transaction) => {
+            const userVoteSnap = await transaction.get(userVoteRef);
 
-        const newUpvotesCount = (suggestionSnap.data().upvotesCount || 0) + 1;
-        transaction.update(suggestionRef, { upvotesCount: newUpvotesCount });
-        transaction.set(userVoteRef, { suggestionId: suggestionId, timestamp: serverTimestamp() });
-      });
+            if (userVoteSnap.exists()) {
+                throw new Error("Already upvoted");
+            }
 
-      toast({
-        title: "Upvoted!",
-        description: "Your vote has been successfully counted.",
-      });
+            const suggestionSnap = await transaction.get(suggestionRef);
+            if (!suggestionSnap.exists()) {
+                throw new Error("Suggestion does not exist!");
+            }
+
+            const newUpvotesCount = (suggestionSnap.data().upvotesCount || 0) + 1;
+            transaction.update(suggestionRef, { upvotesCount: newUpvotesCount });
+            transaction.set(userVoteRef, { suggestionId: suggestionId, timestamp: serverTimestamp() });
+        });
+
+        toast({
+            title: "Upvoted!",
+            description: "Your vote has been successfully counted.",
+        });
 
     } catch (e: any) {
       console.error("Upvote transaction failed: ", e.message);
@@ -116,28 +115,26 @@ export default function SuggestionList() {
         toast({
           variant: "destructive",
           title: "Upvote Failed",
-          description: "An error occurred while casting your vote. Please try again.",
+          description: e.message || "An error occurred. Please try again.",
         });
       }
     }
   }, [firestore, user, toast]);
 
-  const handleSubmitSuggestion = (newSuggestion: Omit<Suggestion, 'suggestionId' | 'upvotesCount' | 'commentsCount'>) => {
+  const handleSubmitSuggestion = (newSuggestion: Omit<Suggestion, 'suggestionId'>) => {
     if (!firestore) return;
     const suggestionRef = doc(collection(firestore, 'suggestions'));
     const fullSuggestion: Suggestion = {
       ...newSuggestion,
-      suggestionId: suggestionRef.id,
-      upvotesCount: 0,
-      commentsCount: 0,
-      submissionTimestamp: serverTimestamp(),
+      suggestionId: suggestionRef.id, // Ensure the ID is set for local state updates if needed
     };
     addDocumentNonBlocking(suggestionRef, fullSuggestion);
   };
   
   const displayedSuggestions = useMemo(() => {
     if (!suggestions) return [];
-    // Ensure suggestionId is the document's actual ID
+    // The useCollection hook already adds `id`. We just need to make sure our type matches.
+    // We'll rename `id` to `suggestionId` for consistency within our app components.
     return suggestions.map(s => ({ ...s, suggestionId: s.id }));
   }, [suggestions]);
   

@@ -28,7 +28,7 @@ export const SuggestionStatuses = [
 export type SuggestionStatus = (typeof SuggestionStatuses)[number];
 
 export interface Suggestion {
-  suggestionId: string;
+  suggestionId: string; // This will be the Firestore document ID
   title: string;
   body: string;
   authorUid: string; // 'ANONYMOUS' or user UID
