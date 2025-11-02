@@ -83,11 +83,12 @@ export default function SuggestionList() {
     try {
       await runTransaction(firestore, async (transaction) => {
         const userVoteSnap = await transaction.get(userVoteRef);
-
+        
         if (userVoteSnap.exists()) {
+          // This check is mostly for safety; the UI should already prevent this.
           throw new Error("Already upvoted");
         }
-
+        
         const suggestionSnap = await transaction.get(suggestionRef);
         if (!suggestionSnap.exists()) {
           throw new Error("Suggestion does not exist!");
@@ -133,8 +134,12 @@ export default function SuggestionList() {
     };
     addDocumentNonBlocking(suggestionRef, fullSuggestion);
   };
-
-  const displayedSuggestions = suggestions || [];
+  
+  const displayedSuggestions = useMemo(() => {
+    if (!suggestions) return [];
+    // Ensure suggestionId is the document's actual ID
+    return suggestions.map(s => ({ ...s, suggestionId: s.id }));
+  }, [suggestions]);
   
   if (isLoading) {
     return (
