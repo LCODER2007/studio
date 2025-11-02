@@ -9,7 +9,7 @@ import { useAuth } from "../auth/AuthContext";
 import { AnimatePresence, motion } from "framer-motion";
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
 import { addDocumentNonBlocking } from "@/firebase/non-blocking-updates";
-import { collection, doc, serverTimestamp, query, where, orderBy, Query, DocumentData } from "firebase/firestore";
+import { collection, doc, serverTimestamp, query, where, orderBy, Query, DocumentData, runTransaction } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 
 type SortOption = "upvotesCount" | "submissionTimestamp";
@@ -27,18 +27,10 @@ export default function SuggestionList() {
     
     let q: Query<DocumentData> = collection(firestore, 'suggestions');
 
-    // Apply filters
     if (filters.category !== 'all') {
       q = query(q, where('category', '==', filters.category));
     }
-    // We don't filter by status on the main page anymore, show all.
-    // if (filters.status !== 'all') {
-    //   q = query(q, where('status', '==', filters.status));
-    // }
 
-    // Apply sorting
-    // Note: Firestore requires an index for this query. 
-    // If you have issues, create a composite index on (category, upvotesCount) and (category, submissionTimestamp).
     q = query(q, orderBy(sortBy, 'desc'));
 
     return q;
@@ -48,7 +40,6 @@ export default function SuggestionList() {
 
   const userVotesQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
-    // This creates a reference to the subcollection of suggestions the user has voted on.
     return collection(firestore, 'user_votes', user.uid, 'suggestions');
   }, [firestore, user]);
 
@@ -75,42 +66,60 @@ export default function SuggestionList() {
     setSortBy(value);
   }, []);
 
-  const handleUpvote = useCallback((suggestionId: string) => {
+  const handleUpvote = useCallback(async (suggestionId: string) => {
     if (!firestore || !user) {
-        toast({
-            variant: "destructive",
-            title: "Authentication Required",
-            description: "Please log in to upvote.",
-        });
-        return;
-    }
-    
-    if (upvotedIds.has(suggestionId)) {
-        toast({
-            variant: "destructive",
-            title: "Already Upvoted",
-            description: "You have already upvoted this suggestion.",
-        });
-        return;
+      toast({
+        variant: "destructive",
+        title: "Authentication Required",
+        description: "Please log in to upvote.",
+      });
+      return;
     }
 
-    // Create a reference to a new document in the 'votes' collection.
-    // This will trigger the `triggerVoteUpdate` Cloud Function.
-    const voteRef = doc(collection(firestore, 'votes'));
-    
-    addDocumentNonBlocking(voteRef, {
-        voteId: voteRef.id,
-        suggestionId,
-        voterUid: user.uid,
-        timestamp: serverTimestamp(),
-    });
+    const suggestionRef = doc(firestore, "suggestions", suggestionId);
+    const userVoteRef = doc(firestore, "user_votes", user.uid, "suggestions", suggestionId);
 
-    toast({
+    try {
+      await runTransaction(firestore, async (transaction) => {
+        const userVoteSnap = await transaction.get(userVoteRef);
+
+        if (userVoteSnap.exists()) {
+          // This throw will be caught by the catch block below.
+          throw new Error("Already upvoted");
+        }
+
+        const suggestionSnap = await transaction.get(suggestionRef);
+        if (!suggestionSnap.exists()) {
+          throw "Suggestion does not exist!";
+        }
+
+        const newUpvotesCount = (suggestionSnap.data().upvotesCount || 0) + 1;
+        transaction.update(suggestionRef, { upvotesCount: newUpvotesCount });
+        transaction.set(userVoteRef, { suggestionId: suggestionId, timestamp: serverTimestamp() });
+      });
+
+      toast({
         title: "Upvoted!",
-        description: "Your vote has been counted.",
-    });
+        description: "Your vote has been successfully counted.",
+      });
 
-  }, [firestore, user, upvotedIds, toast]);
+    } catch (e: any) {
+      console.error("Upvote transaction failed: ", e);
+      if (e.message === "Already upvoted") {
+        toast({
+          variant: "destructive",
+          title: "Already Upvoted",
+          description: "You have already upvoted this suggestion.",
+        });
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Upvote Failed",
+          description: "An error occurred while casting your vote. Please try again.",
+        });
+      }
+    }
+  }, [firestore, user, toast]);
 
   const handleSubmitSuggestion = (newSuggestion: Omit<Suggestion, 'suggestionId' | 'upvotesCount' | 'commentsCount'>) => {
     if (!firestore) return;

@@ -8,8 +8,6 @@
  *   /users/{userId}: User profile data, accessible only to the user.
  *   /suggestions/{suggestionId}: Publicly readable suggestions, with owner-only
  *     or admin-only modification rights.
- *   /votes/{voteId}: Stores user votes, with rules enforcing proper association
- *     between users and suggestions.
  *   /comments/{commentId}: Stores comments on suggestions, linked to the suggestion
  *     and authored by a user.
  *   /roles_admin/{uid}: Indicates admin privileges for a user; the existence of a
@@ -87,28 +85,6 @@ service cloud.firestore {
     }
 
     /**
-     * @description Enforces access control for votes, allowing users to create
-     *   votes and restricting listing to the owner.
-     * @path /votes/{voteId}
-     * @allow (create) Authenticated user can create a vote.
-     * @allow (get) Anyone can get a specific vote, if they know the ID.
-     * @allow (list) No listing allowed.
-     * @deny (update, delete) Votes cannot be updated or deleted.
-     * @principle Enforces document ownership and read access.
-     */
-    match /votes/{voteId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-      function isOwner(voterUid) {
-        return request.auth.uid == voterUid;
-      }
-      
-      allow create: if isSignedIn() && isOwner(request.resource.data.voterUid);
-      allow get, list, update, delete: if false;
-    }
-
-    /**
      * @description Enforces access control for comments, allowing creation by
      *   authenticated users and restricting modification to the owner or an admin.
      * @path /comments/{commentId}
@@ -166,6 +142,7 @@ service cloud.firestore {
         /**
          * @description Restricts listing suggestions under a specific user's votes to that user.
          * @path /user_votes/{userId}/suggestions
+         * @allow (get) Authenticated user can check if they have voted on a specific suggestion.
          * @allow (list) Authenticated user can list suggestions under their own votes.
          * @deny (list) Unauthorized access to other user's vote suggestions.
          * @principle Enforces document ownership for listing user-specific data.
@@ -179,7 +156,7 @@ service cloud.firestore {
             return request.auth.uid == userId;
           }
 
-          allow get: if false;
+          allow get: if isSignedIn() && isOwner(userId);
           allow list: if isSignedIn() && isOwner(userId);
           allow create, update, delete: if false;
         }
