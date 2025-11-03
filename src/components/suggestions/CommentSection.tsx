@@ -3,8 +3,8 @@
 
 import { useState } from 'react';
 import { useAuth } from '@/components/auth/AuthContext';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, orderBy, query, runTransaction, doc, serverTimestamp, addDoc } from 'firebase/firestore';
+import { useCollection, useFirestore, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
+import { collection, orderBy, query, runTransaction, doc, serverTimestamp, addDoc, Transaction } from 'firebase/firestore';
 import type { Comment as CommentType } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -18,6 +18,42 @@ import Link from 'next/link';
 interface CommentSectionProps {
   suggestionId: string;
 }
+
+const handleTransactionError = (
+  error: any,
+  suggestionId: string,
+  newCommentText: string,
+  user: any,
+  toast: any
+) => {
+  if (error.code === 'permission-denied') {
+    const newCommentRef = doc(collection(firestore, 'suggestions', suggestionId, 'comments'));
+    const newCommentData = {
+        commentId: newCommentRef.id,
+        suggestionId: suggestionId,
+        text: newCommentText,
+        authorUid: user.uid,
+        authorDisplayName: user.displayName || 'Anonymous',
+        authorPhotoURL: user.photoURL,
+        createdAt: "SERVER_TIMESTAMP" // Placeholder for serverTimestamp
+    };
+
+    const permissionError = new FirestorePermissionError({
+      path: `suggestions/${suggestionId}/comments/${newCommentRef.id}`,
+      operation: 'create',
+      requestResourceData: newCommentData,
+    });
+    errorEmitter.emit('permission-error', permissionError);
+  } else {
+    console.error('Error posting comment:', error);
+    toast({
+      variant: 'destructive',
+      title: 'Failed to post comment',
+      description: error.message || 'An unknown error occurred.',
+    });
+  }
+};
+
 
 export default function CommentSection({ suggestionId }: CommentSectionProps) {
   const { user } = useAuth();
@@ -57,42 +93,42 @@ export default function CommentSection({ suggestionId }: CommentSectionProps) {
     
     const commentsColRef = collection(firestore, 'suggestions', suggestionId, 'comments');
     const suggestionRef = doc(firestore, 'suggestions', suggestionId);
+    const newCommentData = {
+        text: newComment,
+        authorUid: user.uid,
+        authorDisplayName: user.displayName || 'Anonymous',
+        authorPhotoURL: user.photoURL || null,
+        createdAt: serverTimestamp()
+    };
 
-    try {
-        await runTransaction(firestore, async (transaction) => {
-            const suggestionDoc = await transaction.get(suggestionRef);
-            if (!suggestionDoc.exists()) {
-                throw new Error("Suggestion does not exist.");
-            }
-            
-            const newCommentsCount = (suggestionDoc.data().commentsCount || 0) + 1;
-            transaction.update(suggestionRef, { commentsCount: newCommentsCount });
+    runTransaction(firestore, async (transaction: Transaction) => {
+        const suggestionDoc = await transaction.get(suggestionRef);
+        if (!suggestionDoc.exists()) {
+            throw new Error("Suggestion does not exist.");
+        }
+        
+        const newCommentsCount = (suggestionDoc.data().commentsCount || 0) + 1;
+        transaction.update(suggestionRef, { commentsCount: newCommentsCount });
 
-            // Create a new document reference in the subcollection for the new comment
-            const newCommentRef = doc(commentsColRef);
-
-            transaction.set(newCommentRef, {
-              commentId: newCommentRef.id,
-              suggestionId: suggestionId,
-              text: newComment,
-              authorUid: user.uid,
-              authorDisplayName: user.displayName || 'Anonymous',
-              authorPhotoURL: user.photoURL,
-              createdAt: serverTimestamp()
-            });
-        });
-
+        const newCommentRef = doc(commentsColRef);
+        transaction.set(newCommentRef, { ...newCommentData, commentId: newCommentRef.id, suggestionId: suggestionId });
+    })
+    .then(() => {
         setNewComment('');
-    } catch (error: any) {
-        console.error('Error posting comment:', error);
-        toast({
-            variant: 'destructive',
-            title: 'Failed to post comment',
-            description: error.message || 'An unknown error occurred.',
-        });
-    } finally {
+    })
+    .catch((error: any) => {
+      // Create the rich, contextual error asynchronously.
+       const permissionError = new FirestorePermissionError({
+          path: `suggestions/${suggestionId}/comments`, // Path to the collection
+          operation: 'create',
+          requestResourceData: { ...newCommentData, commentId: '[generated_id]', suggestionId: suggestionId }
+      });
+      // Emit the error with the global error emitter
+      errorEmitter.emit('permission-error', permissionError);
+    })
+    .finally(() => {
         setIsSubmitting(false);
-    }
+    });
   };
 
   return (
