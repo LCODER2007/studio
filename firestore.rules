@@ -44,7 +44,7 @@ service cloud.firestore {
         // ✅ Everyone can read or list comments
         allow get, list: if true;
 
-        // ✅ Signed-in users can comment (allowing serverTimestamp)
+        // ✅ Signed-in users can comment (allowing serverTimestamp and display info)
         allow create: if isSignedIn() &&
           request.resource.data.authorUid == request.auth.uid &&
           request.resource.data.text is string &&
