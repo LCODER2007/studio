@@ -13,13 +13,10 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      function isOwner() {
-        return request.auth.uid == userId;
-      }
       // Allow anyone to read user profiles.
       allow read: if true;
       // Allow only the owner to write to their profile.
-      allow write: if isSignedIn() && isOwner();
+      allow write: if isSignedIn() && request.auth.uid == userId;
     }
 
     match /suggestions/{suggestionId} {
