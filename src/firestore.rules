@@ -7,12 +7,18 @@ service cloud.firestore {
     function isSignedIn() {
       return request.auth != null;
     }
+    
+    function isAdmin() {
+      return exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+    }
 
     match /users/{userId} {
       function isOwner() {
         return request.auth.uid == userId;
       }
-      allow read, write: if isSignedIn() && isOwner();
+      // Allow any signed-in user to read profiles, but only the owner to write.
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && isOwner();
     }
 
     match /suggestions/{suggestionId} {
@@ -22,16 +28,22 @@ service cloud.firestore {
       // Allow authenticated users to create suggestions.
       // The author UID in the new document must match the creator's UID.
       allow create: if isSignedIn() && request.resource.data.authorUid == request.auth.uid;
-      
-      function isAdmin() {
-        return exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
-      }
 
-      // Allow updates if the user is authenticated (for upvoting) or an admin.
+      // Allow updates if the user is authenticated (for upvoting, commenting) or an admin.
       allow update: if isSignedIn();
       
       // Only the author or an admin can delete a suggestion.
       allow delete: if isSignedIn() && (resource.data.authorUid == request.auth.uid || isAdmin());
+
+      // Rules for comments subcollection
+      match /comments/{commentId} {
+          // Allow anyone to read comments
+          allow read, list: if true;
+          // Allow authenticated users to create comments
+          allow create: if isSignedIn() && request.resource.data.authorUid == request.auth.uid;
+          // Only the comment author or an admin can update/delete
+          allow update, delete: if isSignedIn() && (resource.data.authorUid == request.auth.uid || isAdmin());
+      }
     }
     
     // Rules for user-specific voting records within a subcollection.
@@ -47,17 +59,6 @@ service cloud.firestore {
       allow list: if isSignedIn() && isOwner();
       // Prevent updates/deletes to maintain vote integrity.
       allow update, delete: if false;
-    }
-
-    // Rules for comments subcollection
-    match /suggestions/{suggestionId}/comments/{commentId} {
-        allow read, list: if true;
-        allow create: if isSignedIn() && request.resource.data.authorUid == request.auth.uid;
-        allow update, delete: if isSignedIn() && (request.resource.data.authorUid == request.auth.uid || isAdmin());
-    }
-
-    function isAdmin() {
-        return exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
     }
   }
 }

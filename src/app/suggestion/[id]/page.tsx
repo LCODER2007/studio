@@ -11,6 +11,7 @@ import SuggestionDetail from '@/components/suggestions/SuggestionDetail';
 import { useAuth } from '@/components/auth/AuthContext';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import CommentSection from '@/components/suggestions/CommentSection';
 
 export default function SuggestionPage() {
     const { id } = useParams();
@@ -63,7 +64,10 @@ export default function SuggestionPage() {
         <div className="flex flex-col min-h-screen bg-background">
             <Header />
             <main className="flex-1 container mx-auto px-4 py-8 max-w-4xl">
-                <SuggestionDetail suggestion={suggestion} />
+              <SuggestionDetail suggestion={{ ...suggestion, suggestionId: suggestion.id }} />
+              <div className="mt-6">
+                <CommentSection suggestionId={suggestion.id} />
+              </div>
             </main>
         </div>
     );

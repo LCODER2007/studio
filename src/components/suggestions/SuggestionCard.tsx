@@ -46,13 +46,11 @@ export default function SuggestionCard({ suggestion, onUpvote, hasUpvoted }: Sug
     <Card className="flex flex-col h-full transition-all hover:shadow-md">
       <CardHeader>
         <div className="flex justify-between items-start gap-4">
-          <div>
-            <CardTitle className="mt-2 text-lg">
-                <Link href={suggestionLink} className="hover:underline">
-                    {suggestion.title}
-                </Link>
-            </CardTitle>
-          </div>
+          <CardTitle className="mt-2 text-lg">
+              <Link href={suggestionLink} className="hover:underline">
+                  {suggestion.title}
+              </Link>
+          </CardTitle>
           <Tooltip>
             <TooltipTrigger asChild>
               <div className="p-2 rounded-full bg-muted cursor-pointer">
@@ -101,6 +99,10 @@ export default function SuggestionCard({ suggestion, onUpvote, hasUpvoted }: Sug
               {suggestion.upvotesCount}
             </span>
           </Button>
+           <Link href={suggestionLink} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary">
+            <MessageSquare className="h-4 w-4" />
+            <span className="tabular-nums">{suggestion.commentsCount || 0}</span>
+          </Link>
         </div>
         <Link href={suggestionLink} className="text-sm text-primary hover:underline">
           View Details

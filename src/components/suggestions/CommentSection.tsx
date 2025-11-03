@@ -1,10 +1,10 @@
 
 "use client";
 
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { useAuth } from '@/components/auth/AuthContext';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { addDoc, collection, doc, orderBy, query, runTransaction, serverTimestamp } from 'firebase/firestore';
+import { collection, orderBy, query, runTransaction, doc, serverTimestamp } from 'firebase/firestore';
 import type { Comment as CommentType } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -59,8 +59,7 @@ export default function CommentSection({ suggestionId }: CommentSectionProps) {
     const commentsColRef = collection(firestore, 'suggestions', suggestionId, 'comments');
     const newCommentRef = doc(commentsColRef);
 
-    const newComment: Omit<CommentType, 'commentId'> = {
-        suggestionId,
+    const newComment: Omit<CommentType, 'commentId' | 'suggestionId'> = {
         authorUid: user.uid,
         authorDisplayName: user.displayName || 'Anonymous',
         authorPhotoURL: user.photoURL,
@@ -77,7 +76,11 @@ export default function CommentSection({ suggestionId }: CommentSectionProps) {
 
             const newCommentsCount = (suggestionDoc.data().commentsCount || 0) + 1;
             transaction.update(suggestionRef, { commentsCount: newCommentsCount });
-            transaction.set(newCommentRef, { ...newComment, commentId: newCommentRef.id });
+            transaction.set(newCommentRef, { 
+                ...newComment, 
+                commentId: newCommentRef.id,
+                suggestionId: suggestionId,
+            });
         });
 
         setCommentBody('');
@@ -111,7 +114,7 @@ export default function CommentSection({ suggestionId }: CommentSectionProps) {
             </div>
           ))}
           {!isLoading && comments && comments.map((comment) => (
-            <div key={comment.commentId} className="flex items-start space-x-4">
+            <div key={comment.id} className="flex items-start space-x-4">
               <Link href={`/profile/${comment.authorUid}`}>
                 <Avatar>
                   <AvatarImage src={comment.authorPhotoURL ?? ''} />
@@ -122,7 +125,7 @@ export default function CommentSection({ suggestionId }: CommentSectionProps) {
                 <div className="flex items-center gap-2">
                   <Link href={`/profile/${comment.authorUid}`} className="font-semibold text-sm hover:underline">{comment.authorDisplayName}</Link>
                   <span className="text-xs text-muted-foreground">
-                    &bull; {formatDistanceToNow(comment.timestamp?.toDate(), { addSuffix: true })}
+                    &bull; {comment.timestamp ? formatDistanceToNow(comment.timestamp.toDate(), { addSuffix: true }) : 'just now'}
                   </span>
                 </div>
                 <p className="text-sm text-foreground/90">{comment.body}</p>

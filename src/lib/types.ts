@@ -1,5 +1,4 @@
 
-
 export type UserRole = 'STUDENT' | 'SUPER_ADMIN';
 
 export interface UserProfile {
@@ -29,6 +28,7 @@ export interface Suggestion {
   authorPhotoURL?: string | null;
   category: SuggestionCategory;
   upvotesCount: number;
+  commentsCount?: number;
   impactScore: number; // 1-5
   feasibilityRating: number; // 1-5
   costEffectivenessRating: number; // 1-5

@@ -42,6 +42,10 @@
           "type": "number",
           "description": "Number of upvotes for the suggestion."
         },
+        "commentsCount": {
+          "type": "number",
+          "description": "Number of comments on the suggestion."
+        },
         "impactScore": {
           "type": "number",
           "description": "Impact score of the suggestion (1-5, admin rated)."
@@ -106,37 +110,6 @@
       "required": [
         "uid",
         "email"
-      ]
-    },
-    "Vote": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Vote",
-      "type": "object",
-      "description": "Represents a user's vote on a suggestion.",
-      "properties": {
-        "suggestionId": {
-          "type": "string",
-          "description": "Reference to the Suggestion being voted on. (Relationship: Suggestion 1:N Vote)"
-        },
-        "voterUid": {
-          "type": "string",
-          "description": "Reference to the User who cast the vote. (Relationship: User 1:N Vote)"
-        },
-        "timestamp": {
-          "type": "string",
-          "description": "Timestamp of when the vote was cast.",
-          "format": "date-time"
-        },
-        "voteId": {
-          "type": "string",
-          "description": "Unique identifier for the vote entity."
-        }
-      },
-      "required": [
-        "suggestionId",
-        "voterUid",
-        "timestamp",
-        "voteId"
       ]
     },
     "UserVote": {
