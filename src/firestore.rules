@@ -1,62 +1,61 @@
 
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
 
     function isSignedIn() {
       return request.auth != null;
     }
-    
+
     function isAdmin() {
-      return exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+      // In a real app, you might check for a custom claim or a role in the user's doc
+      return exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
 
+    // ---------- Users ----------
     match /users/{userId} {
-      // Allow anyone to read user profiles.
       allow read: if true;
-      // Allow only the owner to write to their profile.
       allow write: if isSignedIn() && request.auth.uid == userId;
+
+      match /user_votes/{suggestionId} {
+        allow get, list: if isSignedIn() && request.auth.uid == userId;
+        allow create: if isSignedIn() && request.auth.uid == userId;
+        allow update, delete: if false;
+      }
     }
 
+    // ---------- Suggestions ----------
     match /suggestions/{suggestionId} {
-      // Allow anyone to read suggestions. This is required for the public suggestion list.
-      allow get, list: if true; 
-      
-      // Allow authenticated users to create suggestions.
-      // The author UID in the new document must match the creator's UID.
+      allow get, list: if true;
       allow create: if isSignedIn() && request.resource.data.authorUid == request.auth.uid;
 
-      // Allow updates if the user is authenticated (for upvoting) or an admin.
-      allow update: if isSignedIn();
-      
-      // Only the author or an admin can delete a suggestion.
-      allow delete: if isSignedIn() && (resource.data.authorUid == request.auth.uid || isAdmin());
+      allow update: if isSignedIn() &&
+        (
+          (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['upvotesCount']) &&
+           request.resource.data.upvotesCount == resource.data.upvotesCount + 1)
+          || (request.auth.uid == resource.data.authorUid)
+          || isAdmin()
+        );
 
-      // Rules for comments subcollection
+      allow delete: if isSignedIn() && (request.auth.uid == resource.data.authorUid || isAdmin());
+
+      // ---------- Comments ----------
       match /comments/{commentId} {
-          // Allow anyone to read and list comments
-          allow read, list: if true;
-          // Allow authenticated users to create comments
-          allow create: if isSignedIn() && request.resource.data.authorUid == request.auth.uid;
-          // Only the comment author or an admin can update/delete
-          allow update, delete: if isSignedIn() && (resource.data.authorUid == request.auth.uid || isAdmin());
+        // ✅ Everyone can read or list comments
+        allow get, list: if true;
+
+        // ✅ Signed-in users can comment (allowing serverTimestamp)
+        allow create: if isSignedIn() &&
+          request.resource.data.authorUid == request.auth.uid &&
+          request.resource.data.text is string &&
+          request.resource.data.createdAt != null;
+
+        // ✅ Delete only by author or admin
+        allow delete: if isSignedIn() &&
+          (request.auth.uid == resource.data.authorUid || isAdmin());
+
+        allow update: if false;
       }
-    }
-    
-    // Rules for user-specific voting records within a subcollection.
-    match /users/{userId}/user_votes/{suggestionId} {
-       function isOwner() {
-        return request.auth.uid == userId;
-      }
-      // Allow a user to check their own votes for the transaction.
-      allow get: if isSignedIn() && isOwner(); 
-      // Allow a user to create a vote document for themselves.
-      allow create: if isSignedIn() && isOwner();
-      // Allow a user to read their own votes for the UI.
-      allow list: if isSignedIn() && isOwner();
-      // Prevent updates/deletes to maintain vote integrity.
-      allow update, delete: if false;
     }
   }
 }

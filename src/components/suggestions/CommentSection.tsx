@@ -4,7 +4,7 @@
 import { useState } from 'react';
 import { useAuth } from '@/components/auth/AuthContext';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, orderBy, query, runTransaction, doc, serverTimestamp } from 'firebase/firestore';
+import { collection, orderBy, query, runTransaction, doc, serverTimestamp, addDoc } from 'firebase/firestore';
 import type { Comment as CommentType } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -23,12 +23,12 @@ export default function CommentSection({ suggestionId }: CommentSectionProps) {
   const { user } = useAuth();
   const firestore = useFirestore();
   const { toast } = useToast();
-  const [commentBody, setCommentBody] = useState('');
+  const [newComment, setNewComment] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const commentsQuery = useMemoFirebase(() => {
     if (!firestore || !suggestionId) return null;
-    return query(collection(firestore, 'suggestions', suggestionId, 'comments'), orderBy('timestamp', 'asc'));
+    return query(collection(firestore, 'suggestions', suggestionId, 'comments'), orderBy('createdAt', 'asc'));
   }, [firestore, suggestionId]);
 
   const { data: comments, isLoading } = useCollection<CommentType>(commentsQuery);
@@ -44,28 +44,19 @@ export default function CommentSection({ suggestionId }: CommentSectionProps) {
       return;
     }
 
-    if (commentBody.trim().length < 10) {
+    if (newComment.trim().length < 1) {
         toast({
             variant: 'destructive',
-            title: 'Comment too short',
-            description: 'Your comment must be at least 10 characters long.',
+            title: 'Comment is empty',
+            description: 'Please write a comment before submitting.',
         });
         return;
     }
 
     setIsSubmitting(true);
     
-    const suggestionRef = doc(firestore, 'suggestions', suggestionId);
     const commentsColRef = collection(firestore, 'suggestions', suggestionId, 'comments');
-    const newCommentRef = doc(commentsColRef);
-
-    const newComment: Omit<CommentType, 'commentId' | 'suggestionId'> = {
-        authorUid: user.uid,
-        authorDisplayName: user.displayName || 'Anonymous',
-        authorPhotoURL: user.photoURL,
-        body: commentBody.trim(),
-        timestamp: serverTimestamp(),
-    };
+    const suggestionRef = doc(firestore, 'suggestions', suggestionId);
 
     try {
         await runTransaction(firestore, async (transaction) => {
@@ -73,17 +64,25 @@ export default function CommentSection({ suggestionId }: CommentSectionProps) {
             if (!suggestionDoc.exists()) {
                 throw new Error("Suggestion does not exist.");
             }
-
+            
             const newCommentsCount = (suggestionDoc.data().commentsCount || 0) + 1;
             transaction.update(suggestionRef, { commentsCount: newCommentsCount });
-            transaction.set(newCommentRef, { 
-                ...newComment, 
-                commentId: newCommentRef.id,
-                suggestionId: suggestionId,
+
+            // Create a new document reference in the subcollection for the new comment
+            const newCommentRef = doc(commentsColRef);
+
+            transaction.set(newCommentRef, {
+              commentId: newCommentRef.id,
+              suggestionId: suggestionId,
+              text: newComment,
+              authorUid: user.uid,
+              authorDisplayName: user.displayName || 'Anonymous',
+              authorPhotoURL: user.photoURL,
+              createdAt: serverTimestamp()
             });
         });
 
-        setCommentBody('');
+        setNewComment('');
     } catch (error: any) {
         console.error('Error posting comment:', error);
         toast({
@@ -125,10 +124,10 @@ export default function CommentSection({ suggestionId }: CommentSectionProps) {
                 <div className="flex items-center gap-2">
                   <Link href={`/profile/${comment.authorUid}`} className="font-semibold text-sm hover:underline">{comment.authorDisplayName}</Link>
                   <span className="text-xs text-muted-foreground">
-                    &bull; {comment.timestamp ? formatDistanceToNow(comment.timestamp.toDate(), { addSuffix: true }) : 'just now'}
+                    &bull; {comment.createdAt ? formatDistanceToNow(comment.createdAt.toDate(), { addSuffix: true }) : 'just now'}
                   </span>
                 </div>
-                <p className="text-sm text-foreground/90">{comment.body}</p>
+                <p className="text-sm text-foreground/90">{comment.text}</p>
               </div>
             </div>
           ))}
@@ -145,11 +144,11 @@ export default function CommentSection({ suggestionId }: CommentSectionProps) {
             <div className="flex-1">
               <Textarea
                 placeholder="Write a comment..."
-                value={commentBody}
-                onChange={(e) => setCommentBody(e.target.value)}
+                value={newComment}
+                onChange={(e) => setNewComment(e.target.value)}
                 disabled={isSubmitting}
               />
-              <Button type="submit" size="sm" className="mt-2" disabled={isSubmitting || commentBody.trim().length < 10}>
+              <Button type="submit" size="sm" className="mt-2" disabled={isSubmitting || newComment.trim().length === 0}>
                 <Send className="mr-2 h-4 w-4" />
                 {isSubmitting ? 'Posting...' : 'Post Comment'}
               </Button>

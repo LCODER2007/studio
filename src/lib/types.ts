@@ -43,6 +43,6 @@ export interface Comment {
     authorUid: string;
     authorDisplayName: string;
     authorPhotoURL?: string | null;
-    body: string;
-    timestamp: any; // Can be Date or Firebase Timestamp
+    text: string;
+    createdAt: any; // Can be Date or Firebase Timestamp
 }
