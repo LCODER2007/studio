@@ -16,8 +16,9 @@ service cloud.firestore {
       function isOwner() {
         return request.auth.uid == userId;
       }
-      // Allow any signed-in user to read profiles, but only the owner to write.
-      allow read: if isSignedIn();
+      // Allow anyone to read user profiles.
+      allow read: if true;
+      // Allow only the owner to write to their profile.
       allow write: if isSignedIn() && isOwner();
     }
 
@@ -29,7 +30,7 @@ service cloud.firestore {
       // The author UID in the new document must match the creator's UID.
       allow create: if isSignedIn() && request.resource.data.authorUid == request.auth.uid;
 
-      // Allow updates if the user is authenticated (for upvoting, commenting) or an admin.
+      // Allow updates if the user is authenticated (for upvoting) or an admin.
       allow update: if isSignedIn();
       
       // Only the author or an admin can delete a suggestion.
@@ -37,7 +38,7 @@ service cloud.firestore {
 
       // Rules for comments subcollection
       match /comments/{commentId} {
-          // Allow anyone to read comments
+          // Allow anyone to read and list comments
           allow read, list: if true;
           // Allow authenticated users to create comments
           allow create: if isSignedIn() && request.resource.data.authorUid == request.auth.uid;
