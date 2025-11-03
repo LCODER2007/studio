@@ -2,60 +2,28 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    function isSignedIn() {
-      return request.auth != null;
+    // Helper function to check if a user is a leader of a given organization
+    function isOrgLeader(orgId) {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isLeader == true &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.organizationId == orgId;
     }
 
-    function isAdmin() {
-      // In a real app, you might check for a custom claim or a role in the user's doc
-      return exists(/databases/$(database)/documents/admins/$(request.auth.uid));
-    }
-
-    // ---------- Users ----------
     match /users/{userId} {
-      allow read: if true;
-      allow write: if isSignedIn() && request.auth.uid == userId;
-
-      match /user_votes/{suggestionId} {
-        allow get, list: if isSignedIn() && request.auth.uid == userId;
-        allow create: if isSignedIn() && request.auth.uid == userId;
-        allow update, delete: if false;
-      }
+      // Allow a user to read/write their own document
+      // OR allow a read if the requester is the leader of the user's organization
+      allow read: if request.auth.uid == userId || isOrgLeader(resource.data.organizationId);
+      allow write: if request.auth.uid == userId;
     }
 
-    // ---------- Suggestions ----------
-    match /suggestions/{suggestionId} {
-      allow get, list: if true;
-      allow create: if isSignedIn() && request.resource.data.authorUid == request.auth.uid;
-
-      allow update: if isSignedIn() &&
-        (
-          (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['upvotesCount']) &&
-           request.resource.data.upvotesCount == resource.data.upvotesCount + 1)
-          || (request.auth.uid == resource.data.authorUid)
-          || isAdmin()
-        );
-
-      allow delete: if isSignedIn() && (request.auth.uid == resource.data.authorUid || isAdmin());
-
-      // ---------- Comments ----------
-      match /comments/{commentId} {
-        // ✅ Everyone can read or list comments
-        allow get, list: if true;
-
-        // ✅ Signed-in users can comment (allowing serverTimestamp)
-        allow create: if isSignedIn() &&
-          request.resource.data.authorUid == request.auth.uid &&
-          request.resource.data.text is string &&
-          request.resource.data.createdAt != null;
-
-        // ✅ Delete only by author or admin
-        allow delete: if isSignedIn() &&
-          (request.auth.uid == resource.data.authorUid || isAdmin());
-
-        allow update: if false;
-      }
+    match /organizations/{orgId} {
+      // Any authenticated user can create an organization (and becomes a leader)
+      // Any authenticated user can read organization info (needed for member signup)
+      allow create, read: if request.auth != null;
+    }
+    
+    match /community-stories/{storyId} {
+      allow read;
+      allow create: if request.auth != null;
     }
   }
 }
