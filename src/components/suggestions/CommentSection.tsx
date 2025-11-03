@@ -4,7 +4,7 @@
 import { useState } from 'react';
 import { useAuth } from '@/components/auth/AuthContext';
 import { useCollection, useFirestore, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
-import { collection, orderBy, query, runTransaction, doc, serverTimestamp, addDoc, Transaction } from 'firebase/firestore';
+import { collection, orderBy, query, runTransaction, doc, serverTimestamp, Transaction } from 'firebase/firestore';
 import type { Comment as CommentType } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -18,42 +18,6 @@ import Link from 'next/link';
 interface CommentSectionProps {
   suggestionId: string;
 }
-
-const handleTransactionError = (
-  error: any,
-  suggestionId: string,
-  newCommentText: string,
-  user: any,
-  toast: any
-) => {
-  if (error.code === 'permission-denied') {
-    const newCommentRef = doc(collection(firestore, 'suggestions', suggestionId, 'comments'));
-    const newCommentData = {
-        commentId: newCommentRef.id,
-        suggestionId: suggestionId,
-        text: newCommentText,
-        authorUid: user.uid,
-        authorDisplayName: user.displayName || 'Anonymous',
-        authorPhotoURL: user.photoURL,
-        createdAt: "SERVER_TIMESTAMP" // Placeholder for serverTimestamp
-    };
-
-    const permissionError = new FirestorePermissionError({
-      path: `suggestions/${suggestionId}/comments/${newCommentRef.id}`,
-      operation: 'create',
-      requestResourceData: newCommentData,
-    });
-    errorEmitter.emit('permission-error', permissionError);
-  } else {
-    console.error('Error posting comment:', error);
-    toast({
-      variant: 'destructive',
-      title: 'Failed to post comment',
-      description: error.message || 'An unknown error occurred.',
-    });
-  }
-};
-
 
 export default function CommentSection({ suggestionId }: CommentSectionProps) {
   const { user } = useAuth();
@@ -111,7 +75,9 @@ export default function CommentSection({ suggestionId }: CommentSectionProps) {
         transaction.update(suggestionRef, { commentsCount: newCommentsCount });
 
         const newCommentRef = doc(commentsColRef);
-        transaction.set(newCommentRef, { ...newCommentData, commentId: newCommentRef.id, suggestionId: suggestionId });
+        // The commentId and suggestionId are implicitly available via the document's path.
+        // We only need to set the core comment data.
+        transaction.set(newCommentRef, newCommentData);
     })
     .then(() => {
         setNewComment('');
@@ -121,7 +87,7 @@ export default function CommentSection({ suggestionId }: CommentSectionProps) {
        const permissionError = new FirestorePermissionError({
           path: `suggestions/${suggestionId}/comments`, // Path to the collection
           operation: 'create',
-          requestResourceData: { ...newCommentData, commentId: '[generated_id]', suggestionId: suggestionId }
+          requestResourceData: newCommentData
       });
       // Emit the error with the global error emitter
       errorEmitter.emit('permission-error', permissionError);
