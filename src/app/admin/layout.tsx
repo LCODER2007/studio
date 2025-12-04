@@ -40,7 +40,7 @@ export default function SuperAdminDashboardLayout({ children }: { children: Reac
     }
   
   return (
-    <RoleGuard roles={['SUPER_ADMIN']}>
+    <RoleGuard roles={['ADMIN', 'SUPER_ADMIN']}>
       <SidebarProvider>
         <div className="flex min-h-screen">
             <Sidebar collapsible="icon">

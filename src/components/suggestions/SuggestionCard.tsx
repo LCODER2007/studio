@@ -20,6 +20,7 @@ import { CategoryIcon } from "./CategoryIcon";
 import { useAuth } from "../auth/AuthContext";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 import Link from 'next/link';
+import { motion, AnimatePresence } from "framer-motion";
 
 interface SuggestionCardProps {
   suggestion: Suggestion;
@@ -41,12 +42,19 @@ export default function SuggestionCard({ suggestion, onUpvote, hasUpvoted }: Sug
     : (suggestion.submissionTimestamp as any)?.toDate();
   
   const suggestionLink = `/suggestion/${suggestion.suggestionId}`;
+  
+  // Determine if upvote count should be displayed based on status
+  const shouldShowUpvoteCount = suggestion.status === 'SHORTLISTED' || suggestion.status === 'IMPLEMENTED';
+  
+  // Display "Anonymous" for anonymous submissions
+  const displayName = suggestion.authorUid === 'ANONYMOUS' ? 'Anonymous' : (suggestion.authorDisplayName || 'Unknown');
+  const isAnonymous = suggestion.authorUid === 'ANONYMOUS';
 
   return (
-    <Card className="flex flex-col h-full transition-all hover:shadow-md">
+    <Card className="flex flex-col h-full transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
       <CardHeader>
         <div className="flex justify-between items-start gap-4">
-          <CardTitle className="mt-2 text-lg">
+          <CardTitle className="mt-2 text-lg line-clamp-2 flex-1">
               <Link href={suggestionLink} className="hover:underline">
                   {suggestion.title}
               </Link>
@@ -64,13 +72,22 @@ export default function SuggestionCard({ suggestion, onUpvote, hasUpvoted }: Sug
         </div>
         <CardDescription>
           <div className="flex items-center gap-2 text-xs text-muted-foreground pt-2">
-            <Link href={`/profile/${suggestion.authorUid}`} className="flex items-center gap-2 hover:underline">
-              <Avatar className="h-5 w-5">
-                <AvatarImage src={suggestion.authorPhotoURL ?? ""} />
-                <AvatarFallback>{suggestion.authorDisplayName?.charAt(0)}</AvatarFallback>
-              </Avatar>
-              <span>{suggestion.authorDisplayName}</span>
-            </Link>
+            {isAnonymous ? (
+              <div className="flex items-center gap-2">
+                <Avatar className="h-5 w-5">
+                  <AvatarFallback>A</AvatarFallback>
+                </Avatar>
+                <span>{displayName}</span>
+              </div>
+            ) : (
+              <Link href={`/profile/${suggestion.authorUid}`} className="flex items-center gap-2 hover:underline">
+                <Avatar className="h-5 w-5">
+                  <AvatarImage src={suggestion.authorPhotoURL ?? ""} />
+                  <AvatarFallback>{displayName.charAt(0)}</AvatarFallback>
+                </Avatar>
+                <span>{displayName}</span>
+              </Link>
+            )}
             <span>&bull;</span>
             <span>
               {submissionDate ? formatDistanceToNow(submissionDate, { addSuffix: true }) : 'just now'}
@@ -91,17 +108,44 @@ export default function SuggestionCard({ suggestion, onUpvote, hasUpvoted }: Sug
             onClick={handleUpvoteClick}
             disabled={!user || hasUpvoted}
             aria-pressed={hasUpvoted}
-            className="group transition-all duration-300"
+            className="group transition-all duration-300 hover:scale-105 active:scale-95"
           >
-            <ArrowUp className={cn("mr-2 h-4 w-4", hasUpvoted ? "text-white" : "group-hover:animate-bounce")} />
+            <motion.div
+              animate={hasUpvoted ? { y: [0, -4, 0] } : {}}
+              transition={{ duration: 0.3 }}
+            >
+              <ArrowUp className={cn("mr-2 h-4 w-4", hasUpvoted ? "text-white" : "group-hover:animate-bounce")} />
+            </motion.div>
             <span>{hasUpvoted ? "Upvoted" : "Upvote"}</span>
-            <span className={cn("ml-2 tabular-nums font-semibold", hasUpvoted && "text-white")}>
-              {suggestion.upvotesCount}
-            </span>
+            {shouldShowUpvoteCount && (
+              <AnimatePresence mode="wait">
+                <motion.span
+                  key={suggestion.upvotesCount}
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 10 }}
+                  transition={{ duration: 0.2 }}
+                  className={cn("ml-2 tabular-nums font-semibold", hasUpvoted && "text-white")}
+                >
+                  {suggestion.upvotesCount}
+                </motion.span>
+              </AnimatePresence>
+            )}
           </Button>
-           <Link href={suggestionLink} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary">
+           <Link href={suggestionLink} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors">
             <MessageSquare className="h-4 w-4" />
-            <span className="tabular-nums">{suggestion.commentsCount || 0}</span>
+            <AnimatePresence mode="wait">
+              <motion.span
+                key={suggestion.commentsCount || 0}
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.8 }}
+                transition={{ duration: 0.2 }}
+                className="tabular-nums"
+              >
+                {suggestion.commentsCount || 0}
+              </motion.span>
+            </AnimatePresence>
           </Link>
         </div>
         <Link href={suggestionLink} className="text-sm text-primary hover:underline">

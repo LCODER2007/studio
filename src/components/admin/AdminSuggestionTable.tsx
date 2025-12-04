@@ -45,17 +45,72 @@ export default function AdminSuggestionTable({ suggestions, onEdit }: AdminSugge
   const columns: ColumnDef<Suggestion>[] = [
     {
       accessorKey: "title",
-      header: "Title",
+      header: ({ column }) => (
+        <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
+          Title
+        </Button>
+      ),
       cell: ({ row }) => <div className="font-medium">{row.getValue("title")}</div>,
     },
     {
+      accessorKey: "authorDisplayName",
+      header: ({ column }) => (
+        <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
+          Author
+        </Button>
+      ),
+      cell: ({ row }) => <div>{row.getValue("authorDisplayName") || "Anonymous"}</div>,
+    },
+    {
       accessorKey: "category",
-      header: "Category",
+      header: ({ column }) => (
+        <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
+          Category
+        </Button>
+      ),
       cell: ({ row }) => <div className="capitalize">{`${row.getValue("category")}`.replace(/_/g, " ").toLowerCase()}</div>,
     },
     {
+      accessorKey: "status",
+      header: ({ column }) => (
+        <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
+          Status
+        </Button>
+      ),
+      cell: ({ row }) => {
+        const status = row.getValue("status") as string;
+        const statusColors: Record<string, string> = {
+          SUBMITTED: "bg-blue-100 text-blue-800",
+          UNDER_REVIEW: "bg-yellow-100 text-yellow-800",
+          SHORTLISTED: "bg-green-100 text-green-800",
+          ARCHIVED_REJECTED: "bg-gray-100 text-gray-800",
+          IMPLEMENTED: "bg-purple-100 text-purple-800",
+        };
+        return (
+          <Badge className={statusColors[status] || ""} variant="outline">
+            {status.replace(/_/g, " ")}
+          </Badge>
+        );
+      },
+    },
+    {
+        accessorKey: "upvotesCount",
+        header: ({ column }) => (
+          <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
+            Upvotes
+          </Button>
+        ),
+        cell: ({ row }) => {
+            return <div className="text-center">{row.getValue("upvotesCount")}</div>
+        },
+    },
+    {
         accessorKey: "submissionTimestamp",
-        header: ({ column }) => <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>Date Submitted</Button>,
+        header: ({ column }) => (
+          <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
+            Date
+          </Button>
+        ),
         cell: ({ row }) => {
           const timestamp = row.getValue("submissionTimestamp");
           if (!timestamp) return null;
@@ -65,18 +120,13 @@ export default function AdminSuggestionTable({ suggestions, onEdit }: AdminSugge
         },
     },
     {
-        accessorKey: "upvotesCount",
-        header: "Upvotes",
-        cell: ({ row }) => {
-            const suggestion = row.original;
-            return <div className="text-center">{row.getValue("upvotesCount")}</div>
-        },
-    },
-    {
       id: "actions",
       enableHiding: false,
       cell: ({ row }) => (
-        <Button variant="ghost" size="sm" onClick={() => onEdit(row.original)}>
+        <Button variant="ghost" size="sm" onClick={(e) => {
+          e.stopPropagation();
+          onEdit(row.original);
+        }}>
           <Edit className="h-4 w-4 mr-2" />
           Review
         </Button>
@@ -118,7 +168,7 @@ export default function AdminSuggestionTable({ suggestions, onEdit }: AdminSugge
           className="max-w-sm"
         />
       </div>
-      <div className="rounded-md border bg-card">
+      <div className="rounded-md border bg-card overflow-x-auto">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
@@ -144,6 +194,8 @@ export default function AdminSuggestionTable({ suggestions, onEdit }: AdminSugge
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
+                  onClick={() => onEdit(row.original)}
+                  className="cursor-pointer hover:bg-muted/50"
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>

@@ -58,6 +58,11 @@ export function AuthButton() {
                     <Crown className="h-3 w-3" />
                     SUPER ADMIN
                 </Badge>
+            ) : role === 'ADMIN' ? (
+                <Badge variant="default" className="flex items-center gap-1">
+                    <Shield className="h-3 w-3" />
+                    ADMIN
+                </Badge>
             ) : (
                 <span className="text-xs text-muted-foreground">{role}</span>
             )}
@@ -74,7 +79,7 @@ export function AuthButton() {
                 <span>My Profile</span>
             </Link>
         </DropdownMenuItem>
-        {role === 'SUPER_ADMIN' && (
+        {(role === 'ADMIN' || role === 'SUPER_ADMIN') && (
             <DropdownMenuItem asChild>
                 <Link href="/admin">
                     <Shield className="mr-2 h-4 w-4" />

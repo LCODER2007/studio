@@ -4,6 +4,8 @@ import { useAuth } from "@/components/auth/AuthContext";
 import type { UserRole } from "@/lib/types";
 import { ShieldAlert } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 import { Button } from "./ui/button";
 
 interface RoleGuardProps {
@@ -12,7 +14,15 @@ interface RoleGuardProps {
 }
 
 export default function RoleGuard({ roles, children }: RoleGuardProps) {
-  const { role, loading } = useAuth();
+  const { user, role, loading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    // Redirect unauthenticated users to login
+    if (!loading && !user) {
+      router.push('/login');
+    }
+  }, [loading, user, router]);
 
   if (loading) {
     // You can render a loading skeleton here
@@ -23,6 +33,12 @@ export default function RoleGuard({ roles, children }: RoleGuardProps) {
     );
   }
 
+  // If user is not authenticated, show nothing (redirect will happen)
+  if (!user) {
+    return null;
+  }
+
+  // If user doesn't have the required role, show access denied
   if (!role || !roles.includes(role)) {
     return (
       <div className="flex flex-col items-center justify-center h-screen text-center p-4">

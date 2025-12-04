@@ -4,6 +4,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
+import { v4 as uuidv4 } from 'uuid';
 
 import { Button } from "@/components/ui/button";
 import {
@@ -39,8 +40,17 @@ import { useToast } from "@/hooks/use-toast";
 import { serverTimestamp } from "firebase/firestore";
 
 const formSchema = z.object({
-  title: z.string().min(10, "Title must be at least 10 characters.").max(100, "Title cannot exceed 100 characters."),
-  body: z.string().min(50, "Suggestion body must be at least 50 characters."),
+  title: z.string()
+    .min(10, "Title must be at least 10 characters.")
+    .max(100, "Title cannot exceed 100 characters.")
+    .refine((val) => val.trim().length > 0, {
+      message: "Title cannot be empty or contain only whitespace.",
+    }),
+  body: z.string()
+    .min(50, "Suggestion body must be at least 50 characters.")
+    .refine((val) => val.trim().length >= 50, {
+      message: "Suggestion body must contain at least 50 non-whitespace characters.",
+    }),
   category: z.enum(SuggestionCategories),
   isAnonymous: z.boolean().default(false),
 });
@@ -50,7 +60,7 @@ type FormValues = z.infer<typeof formSchema>;
 interface SubmitSuggestionDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (suggestion: Omit<Suggestion, 'suggestionId'>) => void;
+  onSubmit: (suggestion: Omit<Suggestion, 'suggestionId'> & { suggestionId: string }) => Promise<void>;
 }
 
 export function SubmitSuggestionDialog({ open, onOpenChange, onSubmit }: SubmitSuggestionDialogProps) {
@@ -66,7 +76,7 @@ export function SubmitSuggestionDialog({ open, onOpenChange, onSubmit }: SubmitS
     },
   });
 
-  const handleFormSubmit = (values: FormValues) => {
+  const handleFormSubmit = async (values: FormValues) => {
     if (!user) {
       toast({
         variant: "destructive",
@@ -76,10 +86,15 @@ export function SubmitSuggestionDialog({ open, onOpenChange, onSubmit }: SubmitS
       return;
     }
 
-    const newSuggestion: Omit<Suggestion, 'suggestionId'> = {
-      title: values.title,
-      body: values.body,
+    // Generate UUID for the suggestion
+    const suggestionId = uuidv4();
+
+    const newSuggestion: Omit<Suggestion, 'suggestionId'> & { suggestionId: string } = {
+      suggestionId,
+      title: values.title.trim(),
+      body: values.body.trim(),
       category: values.category,
+      status: 'SUBMITTED',
       authorUid: values.isAnonymous ? 'ANONYMOUS' : user.uid,
       authorDisplayName: values.isAnonymous ? 'Anonymous' : user.displayName || 'User',
       authorPhotoURL: values.isAnonymous ? 'https://picsum.photos/seed/anonymous-avatar/100/100' : user.photoURL,
@@ -90,13 +105,19 @@ export function SubmitSuggestionDialog({ open, onOpenChange, onSubmit }: SubmitS
       costEffectivenessRating: 0,
     };
     
-    onSubmit(newSuggestion);
-    toast({
+    try {
+      await onSubmit(newSuggestion);
+      toast({
         title: "Suggestion Submitted!",
         description: "Thank you for your contribution to improving our community.",
-    });
-    onOpenChange(false);
-    form.reset();
+      });
+      form.reset();
+      onOpenChange(false);
+    } catch (error) {
+      // Error is already handled by onSubmit in SuggestionList
+      // Just log it here for debugging
+      console.error('Suggestion submission error:', error);
+    }
   };
 
   return (
@@ -186,7 +207,7 @@ export function SubmitSuggestionDialog({ open, onOpenChange, onSubmit }: SubmitS
             />
             <DialogFooter>
               <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
-              <Button type="submit">Submit Suggestion</Button>
+              <Button type="submit" variant="accent">Submit Suggestion</Button>
             </DialogFooter>
           </form>
         </Form>

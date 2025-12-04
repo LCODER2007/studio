@@ -23,7 +23,36 @@ async function getUserProfile(db: any, user: User): Promise<UserProfile> {
     const userDoc = await getDoc(userDocRef);
 
     if (userDoc.exists()) {
-      return userDoc.data() as UserProfile;
+      const existingProfile = userDoc.data() as UserProfile;
+      
+      // Update profile if Google sign-in provides new information
+      const needsUpdate = 
+        user.displayName !== existingProfile.displayName ||
+        user.photoURL !== existingProfile.photoURL ||
+        user.email !== existingProfile.email;
+      
+      if (needsUpdate) {
+        const updatedProfile: UserProfile = {
+          ...existingProfile,
+          email: user.email,
+          displayName: user.displayName,
+          photoURL: user.photoURL,
+        };
+        
+        // Non-blocking update
+        setDoc(userDocRef, updatedProfile, { merge: true }).catch(err => {
+          const permissionError = new FirestorePermissionError({
+            path: userDocRef.path,
+            operation: 'update',
+            requestResourceData: updatedProfile,
+          });
+          errorEmitter.emit('permission-error', permissionError);
+        });
+        
+        return updatedProfile;
+      }
+      
+      return existingProfile;
     } else {
       // This is a new user, create their profile document
       const newUserProfile: UserProfile = {

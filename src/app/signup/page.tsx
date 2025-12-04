@@ -7,7 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { Lightbulb, UserPlus } from 'lucide-react';
-import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { GoogleAuthProvider, signInWithPopup, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 
 import { Button } from "@/components/ui/button";
 import {
@@ -61,17 +61,44 @@ export default function SignUpPage() {
     defaultValues: { displayName: "", email: "", password: "" },
   });
 
-  const onSubmit = (values: FormValues) => {
+  const onSubmit = async (values: FormValues) => {
     setIsSubmitting(true);
-    initiateEmailSignUp(auth, values.email, values.password, values.displayName);
-    
-    toast({
-        title: "Creating Account...",
-        description: "You will be redirected shortly.",
-    });
-
-    // The useEffect hook will handle redirection on successful auth change.
-    setTimeout(() => setIsSubmitting(false), 3000); 
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
+      
+      // Update the user's display name
+      if (userCredential.user) {
+        await updateProfile(userCredential.user, { 
+          displayName: values.displayName 
+        });
+      }
+      
+      toast({
+        title: "Account Created Successfully",
+        description: "Welcome to SEES UNILAG Innovation Hub!",
+      });
+    } catch (error: any) {
+      let errorMessage = "An error occurred during sign up.";
+      
+      // Handle specific Firebase auth errors
+      if (error.code === 'auth/email-already-in-use') {
+        errorMessage = "An account with this email already exists.";
+      } else if (error.code === 'auth/invalid-email') {
+        errorMessage = "Invalid email address.";
+      } else if (error.code === 'auth/weak-password') {
+        errorMessage = "Password is too weak. Please use at least 6 characters.";
+      } else if (error.code === 'auth/operation-not-allowed') {
+        errorMessage = "Email/password accounts are not enabled.";
+      }
+      
+      toast({
+        variant: "destructive",
+        title: "Sign Up Failed",
+        description: errorMessage,
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleGoogleSignUp = async () => {

@@ -1,0 +1,10 @@
+{
+  "projects": {
+    "default": "studio-2819594368-36cb9",
+    "development": "studio-2819594368-36cb9",
+    "staging": "your-staging-project-id",
+    "production": "your-production-project-id"
+  },
+  "targets": {},
+  "etags": {}
+}

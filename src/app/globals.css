@@ -1,28 +1,30 @@
+@import url('https://fonts.googleapis.com/css2?family=PT+Sans:wght@400;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    --background: 0 0% 96.1%; /* #F5F5F5 */
-    --foreground: 240 10% 3.9%;
+    --background: 0 0% 96.1%; /* #F5F5F5 - Light gray background */
+    --foreground: 231 48% 48%; /* Deep blue for text */
     --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
+    --card-foreground: 231 48% 48%;
     --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
-    --primary: 142 76% 36%; /* Light Green */
+    --popover-foreground: 231 48% 48%;
+    --primary: 231 48% 48%; /* #3F51B5 - Deep blue primary */
     --primary-foreground: 0 0% 98%;
     --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 10%;
+    --secondary-foreground: 231 48% 48%;
     --muted: 240 4.8% 95.9%;
     --muted-foreground: 240 3.8% 46.1%;
-    --accent: 36 100% 50%; /* #FF9800 */
-    --accent-foreground: 240 5.9% 10%;
+    --accent: 36 100% 50%; /* #FF9800 - Orange accent for CTAs */
+    --accent-foreground: 0 0% 98%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
     --border: 240 5.9% 90%;
     --input: 240 5.9% 90%;
-    --ring: 142 76% 36%;
+    --ring: 231 48% 48%; /* Deep blue ring */
     --radius: 0.5rem;
   }
 
@@ -54,6 +56,31 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-body;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-headline;
+  }
+}
+
+@layer utilities {
+  @keyframes shimmer {
+    0% {
+      background-position: -1000px 0;
+    }
+    100% {
+      background-position: 1000px 0;
+    }
+  }
+  
+  .animate-shimmer {
+    animation: shimmer 2s infinite linear;
+    background: linear-gradient(
+      to right,
+      hsl(var(--muted)) 0%,
+      hsl(var(--muted-foreground) / 0.1) 50%,
+      hsl(var(--muted)) 100%
+    );
+    background-size: 1000px 100%;
   }
 }

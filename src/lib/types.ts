@@ -1,5 +1,5 @@
 
-export type UserRole = 'STUDENT' | 'SUPER_ADMIN';
+export type UserRole = 'STUDENT' | 'ADMIN' | 'SUPER_ADMIN';
 
 export interface UserProfile {
   uid: string;
@@ -19,6 +19,15 @@ export const SuggestionCategories = [
 ] as const;
 export type SuggestionCategory = (typeof SuggestionCategories)[number];
 
+export const SuggestionStatuses = [
+  'SUBMITTED',
+  'UNDER_REVIEW',
+  'SHORTLISTED',
+  'ARCHIVED_REJECTED',
+  'IMPLEMENTED',
+] as const;
+export type SuggestionStatus = (typeof SuggestionStatuses)[number];
+
 export interface Suggestion {
   suggestionId: string; // This will be the Firestore document ID
   title: string;
@@ -27,6 +36,7 @@ export interface Suggestion {
   authorDisplayName: string; // "Anonymous" or user display name
   authorPhotoURL?: string | null;
   category: SuggestionCategory;
+  status: SuggestionStatus;
   upvotesCount: number;
   commentsCount?: number;
   impactScore: number; // 1-5
@@ -45,4 +55,11 @@ export interface Comment {
     authorPhotoURL?: string | null;
     text: string;
     createdAt: any; // Can be Date or Firebase Timestamp
+}
+
+export interface Vote {
+  voteId: string; // Format: `${voterUid}_${suggestionId}`
+  suggestionId: string;
+  voterUid: string;
+  timestamp: any; // Can be Date or Firebase Timestamp
 }

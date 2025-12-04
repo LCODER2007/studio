@@ -1,164 +1,311 @@
 /**
- * @file Firestore Security Rules
- * @core_philosophy This ruleset enforces a user-ownership model for user data,
- *   public read access for suggestions, and admin-only modification rights where
- *   specified. It leverages denormalization to simplify authorization checks and
- *   structural segregation to maintain clear security boundaries.
- * @data_structure
- *   /users/{userId}: User profile data, accessible only to the user.
- *   /suggestions/{suggestionId}: Publicly readable suggestions, with owner-only
- *     or admin-only modification rights.
- *   /comments/{commentId}: Stores comments on suggestions, linked to the suggestion
- *     and authored by a user.
- *   /roles_admin/{uid}: Indicates admin privileges for a user; the existence of a
- *     document with a user's UID grants admin rights.
- * @key_security_decisions
- *   - User listing is disabled to protect user privacy.
- *   - Suggestions are publicly readable to encourage participation.
- *   - Admin roles are managed via a dedicated collection for efficient checks.
- *   - All write operations require authentication.
- * @denormalization_for_authorization
- *   - The suggestions documents contains `authorUid` to determine owner.
- * @structural_segregation
- *   - Admin roles are stored in a separate collection (/roles_admin/{uid}) to
- *     simplify admin privilege checks.
+ * Firebase Cloud Functions for SEES UNILAG Innovation Hub
+ * 
+ * EMAIL SERVICE CONFIGURATION:
+ * The sendEmail function is currently a placeholder. To enable actual email sending:
+ * 
+ * Option 1: Firebase Email Extension (Recommended)
+ * - Install: https://extensions.dev/extensions/firebase/firestore-send-email
+ * - Configure SMTP settings in Firebase Console
+ * - Uncomment the Firebase Email Extension code in sendEmail()
+ * 
+ * Option 2: SendGrid
+ * - Install: npm install @sendgrid/mail
+ * - Set SENDGRID_API_KEY in Firebase Functions config
+ * - Uncomment the SendGrid code in sendEmail()
+ * 
+ * Option 3: AWS SES or other SMTP service
+ * - Install nodemailer: npm install nodemailer
+ * - Configure SMTP credentials
+ * - Implement custom email sending logic
  */
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
 
-    /**
-     * @description Enforces user-ownership for user profiles.
-     * @path /users/{userId}
-     * @allow (create) Authenticated user can create their own profile.
-     * @allow (get, update, delete) Authenticated user can access and modify their own profile.
-     * @deny (create, get, update, delete) Unauthorized access to other user profiles.
-     * @principle Enforces document ownership for writes.
-     */
-    match /users/{userId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-      function isOwner(userId) {
-        return request.auth.uid == userId;
-      }
-      function isExistingOwner(userId) {
-        return isOwner(userId) && resource != null;
-      }
+import * as functions from 'firebase-functions';
+import * as admin from 'firebase-admin';
 
-      allow get: if isSignedIn() && isOwner(userId);
-      allow list: if false;
-      allow create: if isSignedIn() && isOwner(userId) && request.resource.data.uid == request.auth.uid;
-      allow update: if isSignedIn() && isExistingOwner(userId) && request.resource.data.uid == request.auth.uid;
-      allow delete: if isSignedIn() && isExistingOwner(userId);
+// Initialize Firebase Admin
+admin.initializeApp();
+
+// Types
+interface SuggestionData {
+  suggestionId: string;
+  title: string;
+  body: string;
+  authorUid: string;
+  status: string;
+  publicFeedback?: string;
+}
+
+interface UserData {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+}
+
+/**
+ * Cloud Function: onVoteCreated
+ * Triggers when a new vote document is created in the /votes collection
+ * Atomically increments the upvotesCount on the corresponding suggestion
+ * 
+ * @trigger Firestore document creation at /votes/{voteId}
+ * @validates Requirements 3.4
+ */
+export const onVoteCreated = functions.firestore
+  .document('votes/{voteId}')
+  .onCreate(async (snap, context) => {
+    const voteData = snap.data();
+    const suggestionId = voteData.suggestionId;
+    
+    if (!suggestionId) {
+      console.error('Vote document missing suggestionId:', snap.id);
+      return;
     }
-
-    /**
-     * @description Allows public read access to suggestions and restricts write
-     *   access to the owner or an admin.
-     * @path /suggestions/{suggestionId}
-     * @allow (get, list) Publicly readable.
-     * @allow (create) Authenticated user can create a suggestion with their UID as the authorUid.
-     * @allow (update, delete) Only the owner or an admin can update/delete.
-     * @deny (create) Creation fails if authorUid doesn't match the authenticated user.
-     * @deny (update, delete) Non-owners and non-admins cannot modify suggestions.
-     * @principle Public read access with owner-only writes.
-     */
-    match /suggestions/{suggestionId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-      function isOwner(authorUid) {
-        return request.auth.uid == authorUid;
-      }
-      function isAdmin() {
-        return exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
-      }
-      function isExistingOwner(authorUid) {
-        return isOwner(authorUid) && resource != null;
-      }
-
-      allow get, list: if true;
-      allow create: if isSignedIn() && request.resource.data.authorUid == request.auth.uid;
-      allow update: if isSignedIn() && (isOwner(resource.data.authorUid) || isAdmin());
-      allow delete: if isSignedIn() && (isOwner(resource.data.authorUid) || isAdmin());
-    }
-
-    /**
-     * @description Enforces access control for comments, allowing creation by
-     *   authenticated users and restricting modification to the owner or an admin.
-     * @path /comments/{commentId}
-     * @allow (create) Authenticated user can create a comment.
-     * @allow (get) Anyone can get a specific comment, if they know the ID.
-     * @allow (list) No listing allowed, should be handled via subcollection.
-     * @deny (update, delete) Only the owner or an admin can update/delete.
-     * @principle Enforces document ownership for writes.
-     */
-    match /comments/{commentId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-      function isOwner(authorUid) {
-        return request.auth.uid == authorUid;
-      }
-      function isAdmin() {
-        return exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
-      }
-      function isExistingOwner(authorUid) {
-        return isOwner(authorUid) && resource != null;
-      }
-
-      allow get: if true;
-      allow list: if false;
-      allow create: if isSignedIn() && request.resource.data.authorUid == request.auth.uid;
-      allow update: if isSignedIn() && (resource.data.authorUid == request.auth.uid || isAdmin());
-      allow delete: if isSignedIn() && (resource.data.authorUid == request.auth.uid || isAdmin());
-    }
-
-    /**
-     * @description Grants admin privileges based on the existence of a document
-     *   in this collection.
-     * @path /roles_admin/{uid}
-     * @allow (create) Only a super admin can create an admin role.
-     * @allow (get) Anyone can check if a user is an admin.
-     * @deny (update, delete) Admin roles can only be managed by a super admin.
-     * @principle Role-based access control.
-     */
-    match /roles_admin/{uid} {
-      function isSuperAdmin() {
-        // In a real application, you'd likely have a more robust way to manage super admins.
-        // For prototyping, you might hardcode a specific UID or check for a specific claim
-        // in the user's JWT.
-        return false; // Placeholder: Replace with your super admin check.
-      }
-
-      allow get: if true;
-      allow list: if false;
-      allow create: if isSuperAdmin();
-      allow update: if false;
-      allow delete: if isSuperAdmin();
-    }
-
-        /**
-         * @description Restricts listing suggestions under a specific user's votes to that user.
-         * @path /user_votes/{userId}/suggestions
-         * @allow (get) Authenticated user can check if they have voted on a specific suggestion.
-         * @allow (list) Authenticated user can list suggestions under their own votes.
-         * @deny (list) Unauthorized access to other user's vote suggestions.
-         * @principle Enforces document ownership for listing user-specific data.
-         */
-        match /user_votes/{userId}/suggestions/{suggestionId} {
-          function isSignedIn() {
-            return request.auth != null;
-          }
-
-          function isOwner(userId) {
-            return request.auth.uid == userId;
-          }
-
-          allow get: if isSignedIn() && isOwner(userId);
-          allow list: if isSignedIn() && isOwner(userId);
-          allow create, update, delete: if false;
+    
+    const db = admin.firestore();
+    const suggestionRef = db.collection('suggestions').doc(suggestionId);
+    
+    try {
+      // Use a transaction to atomically increment the upvote count
+      await db.runTransaction(async (transaction) => {
+        const suggestionDoc = await transaction.get(suggestionRef);
+        
+        if (!suggestionDoc.exists) {
+          console.error('Suggestion does not exist:', suggestionId);
+          throw new Error(`Suggestion ${suggestionId} not found`);
         }
+        
+        const currentCount = suggestionDoc.data()?.upvotesCount || 0;
+        const newCount = currentCount + 1;
+        
+        transaction.update(suggestionRef, {
+          upvotesCount: newCount
+        });
+        
+        console.log(`Incremented upvote count for suggestion ${suggestionId}: ${currentCount} -> ${newCount}`);
+      });
+      
+      return null;
+    } catch (error) {
+      console.error('Error incrementing upvote count:', error);
+      
+      // Retry logic: If the transaction fails, we can rely on Firebase Functions
+      // automatic retry mechanism for transient failures
+      throw error;
+    }
+  });
+
+/**
+ * Cloud Function: onSuggestionStatusChange
+ * Triggers when a suggestion's status field is updated
+ * Sends email notifications to the author and all voters when status changes to SHORTLISTED or IMPLEMENTED
+ * 
+ * @trigger Firestore document update at /suggestions/{suggestionId}
+ * @validates Requirements 6.3, 7.1, 7.2, 7.3, 7.4, 7.5
+ */
+export const onSuggestionStatusChange = functions.firestore
+  .document('suggestions/{suggestionId}')
+  .onUpdate(async (change, context) => {
+    const beforeData = change.before.data() as SuggestionData;
+    const afterData = change.after.data() as SuggestionData;
+    const suggestionId = context.params.suggestionId;
+    
+    // Check if status has changed
+    if (beforeData.status === afterData.status) {
+      console.log(`No status change for suggestion ${suggestionId}, skipping notification`);
+      return null;
+    }
+    
+    // Only send notifications for SHORTLISTED or IMPLEMENTED status
+    const newStatus = afterData.status;
+    if (newStatus !== 'SHORTLISTED' && newStatus !== 'IMPLEMENTED') {
+      console.log(`Status changed to ${newStatus}, not sending notifications`);
+      return null;
+    }
+    
+    console.log(`Status changed from ${beforeData.status} to ${newStatus} for suggestion ${suggestionId}`);
+    
+    const db = admin.firestore();
+    const emailsToNotify: string[] = [];
+    const recipientNames: Map<string, string> = new Map();
+    
+    try {
+      // 1. Fetch author email (skip if anonymous)
+      if (afterData.authorUid && afterData.authorUid !== 'ANONYMOUS') {
+        try {
+          const authorDoc = await db.collection('users').doc(afterData.authorUid).get();
+          if (authorDoc.exists) {
+            const authorData = authorDoc.data() as UserData;
+            if (authorData.email) {
+              emailsToNotify.push(authorData.email);
+              recipientNames.set(authorData.email, authorData.displayName || 'User');
+              console.log(`Added author email: ${authorData.email}`);
+            }
+          }
+        } catch (error) {
+          console.error(`Error fetching author profile for ${afterData.authorUid}:`, error);
+        }
+      } else {
+        console.log('Suggestion is anonymous, skipping author notification');
+      }
+      
+      // 2. Query votes collection to get all voter UIDs
+      const votesSnapshot = await db.collection('votes')
+        .where('suggestionId', '==', suggestionId)
+        .get();
+      
+      console.log(`Found ${votesSnapshot.size} votes for suggestion ${suggestionId}`);
+      
+      // 3. Fetch voter emails from user profiles
+      const voterUids = new Set<string>();
+      votesSnapshot.forEach(doc => {
+        const voteData = doc.data();
+        if (voteData.voterUid && voteData.voterUid !== afterData.authorUid) {
+          voterUids.add(voteData.voterUid);
+        }
+      });
+      
+      // Fetch user profiles for all voters
+      const voterEmailPromises = Array.from(voterUids).map(async (voterUid) => {
+        try {
+          const voterDoc = await db.collection('users').doc(voterUid).get();
+          if (voterDoc.exists) {
+            const voterData = voterDoc.data() as UserData;
+            if (voterData.email && !emailsToNotify.includes(voterData.email)) {
+              emailsToNotify.push(voterData.email);
+              recipientNames.set(voterData.email, voterData.displayName || 'User');
+              console.log(`Added voter email: ${voterData.email}`);
+            }
+          }
+        } catch (error) {
+          console.error(`Error fetching voter profile for ${voterUid}:`, error);
+        }
+      });
+      
+      await Promise.all(voterEmailPromises);
+      
+      console.log(`Total emails to notify: ${emailsToNotify.length}`);
+      
+      // 4. Send notification emails
+      if (emailsToNotify.length === 0) {
+        console.log('No emails to send');
+        return null;
+      }
+      
+      // Prepare email content
+      const statusLabel = newStatus === 'SHORTLISTED' ? 'Shortlisted' : 'Implemented';
+      const emailSubject = `Suggestion Update: "${afterData.title}" is now ${statusLabel}`;
+      
+      // Send emails to all recipients
+      const emailPromises = emailsToNotify.map(async (email) => {
+        const recipientName = recipientNames.get(email) || 'User';
+        const emailBody = generateEmailBody(
+          recipientName,
+          afterData.title,
+          statusLabel,
+          afterData.publicFeedback,
+          suggestionId
+        );
+        
+        try {
+          await sendEmail(email, emailSubject, emailBody);
+          console.log(`Email sent successfully to ${email}`);
+        } catch (error) {
+          console.error(`Failed to send email to ${email}:`, error);
+          // Continue processing other emails even if one fails
+        }
+      });
+      
+      await Promise.all(emailPromises);
+      
+      console.log(`Notification process completed for suggestion ${suggestionId}`);
+      return null;
+      
+    } catch (error) {
+      console.error('Error in onSuggestionStatusChange:', error);
+      throw error;
+    }
+  });
+
+/**
+ * Generate email body content for status change notifications
+ */
+function generateEmailBody(
+  recipientName: string,
+  suggestionTitle: string,
+  newStatus: string,
+  publicFeedback: string | undefined,
+  suggestionId: string
+): string {
+  let body = `Hello ${recipientName},\n\n`;
+  body += `Great news! The suggestion "${suggestionTitle}" has been ${newStatus.toLowerCase()}.\n\n`;
+  
+  if (newStatus === 'Shortlisted') {
+    body += `This means your suggestion has been selected for further consideration and review. `;
+    body += `The team will be evaluating it for potential implementation.\n\n`;
+  } else if (newStatus === 'Implemented') {
+    body += `This means your suggestion has been successfully implemented! `;
+    body += `Thank you for contributing to the improvement of SEES UNILAG Innovation Hub.\n\n`;
   }
+  
+  if (publicFeedback) {
+    body += `Feedback from the review team:\n${publicFeedback}\n\n`;
+  }
+  
+  body += `We'd love to hear your thoughts on this update. `;
+  body += `Please feel free to provide feedback or ask questions by visiting the suggestion page.\n\n`;
+  body += `View the suggestion: [Link to suggestion ${suggestionId}]\n\n`;
+  body += `Thank you for your participation!\n\n`;
+  body += `Best regards,\n`;
+  body += `SEES UNILAG Innovation Hub Team`;
+  
+  return body;
+}
+
+/**
+ * Send email using configured email service
+ * This is a placeholder that should be replaced with actual email service integration
+ * Options: Firebase Email Extension, SendGrid, AWS SES, etc.
+ */
+async function sendEmail(
+  to: string,
+  subject: string,
+  body: string
+): Promise<void> {
+  // TODO: Integrate with actual email service
+  // Option 1: Firebase Email Extension (trigger-email-extension)
+  // Option 2: SendGrid API
+  // Option 3: AWS SES
+  // Option 4: Nodemailer with SMTP
+  
+  // For now, we'll log the email that would be sent
+  // In production, replace this with actual email sending logic
+  
+  console.log('=== EMAIL TO BE SENT ===');
+  console.log(`To: ${to}`);
+  console.log(`Subject: ${subject}`);
+  console.log(`Body:\n${body}`);
+  console.log('========================');
+  
+  // Example integration with Firebase Email Extension:
+  // await admin.firestore().collection('mail').add({
+  //   to: to,
+  //   message: {
+  //     subject: subject,
+  //     text: body,
+  //     html: body.replace(/\n/g, '<br>')
+  //   }
+  // });
+  
+  // Example integration with SendGrid:
+  // const sgMail = require('@sendgrid/mail');
+  // sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+  // await sgMail.send({
+  //   to: to,
+  //   from: 'noreply@seesunilag.edu.ng',
+  //   subject: subject,
+  //   text: body,
+  //   html: body.replace(/\n/g, '<br>')
+  // });
+  
+  return Promise.resolve();
 }

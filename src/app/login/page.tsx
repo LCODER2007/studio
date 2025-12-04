@@ -7,7 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { Lightbulb, LogIn } from 'lucide-react';
-import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword } from 'firebase/auth';
 
 import { Button } from "@/components/ui/button";
 import {
@@ -65,16 +65,38 @@ export default function LoginPage() {
     defaultValues: { email: "", password: "" },
   });
 
-  const onSubmit = (values: FormValues) => {
+  const onSubmit = async (values: FormValues) => {
     setIsSubmitting(true);
-    initiateEmailSignIn(auth, values.email, values.password);
-    
-    toast({
-        title: "Signing In...",
-        description: "You will be redirected shortly.",
-    });
-
-    setTimeout(() => setIsSubmitting(false), 3000); 
+    try {
+      await signInWithEmailAndPassword(auth, values.email, values.password);
+      toast({
+        title: "Signed In Successfully",
+        description: "Redirecting...",
+      });
+    } catch (error: any) {
+      let errorMessage = "An error occurred during sign in.";
+      
+      // Handle specific Firebase auth errors
+      if (error.code === 'auth/user-not-found') {
+        errorMessage = "No account found with this email.";
+      } else if (error.code === 'auth/wrong-password') {
+        errorMessage = "Incorrect password.";
+      } else if (error.code === 'auth/invalid-email') {
+        errorMessage = "Invalid email address.";
+      } else if (error.code === 'auth/user-disabled') {
+        errorMessage = "This account has been disabled.";
+      } else if (error.code === 'auth/too-many-requests') {
+        errorMessage = "Too many failed attempts. Please try again later.";
+      }
+      
+      toast({
+        variant: "destructive",
+        title: "Sign In Failed",
+        description: errorMessage,
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleGoogleSignIn = async () => {

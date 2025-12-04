@@ -4,6 +4,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from '@/components/auth/AuthContext';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
+import { OfflineIndicator } from '@/components/OfflineIndicator';
 
 export const metadata: Metadata = {
   title: 'SEES UNILAG Innovation Hub',
@@ -26,6 +27,7 @@ export default function RootLayout({
         <FirebaseClientProvider>
           <TooltipProvider>
             <AuthProvider>
+              <OfflineIndicator />
               {children}
               <Toaster />
             </AuthProvider>

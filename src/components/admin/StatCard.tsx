@@ -2,6 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LucideIcon } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface StatCardProps {
     title: string;
@@ -17,7 +18,18 @@ export function StatCard({ title, value, icon: Icon }: StatCardProps) {
                 <Icon className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-                <div className="text-2xl font-bold">{value}</div>
+                <AnimatePresence mode="wait">
+                    <motion.div
+                        key={value}
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 10 }}
+                        transition={{ duration: 0.2 }}
+                        className="text-2xl font-bold"
+                    >
+                        {value}
+                    </motion.div>
+                </AnimatePresence>
             </CardContent>
         </Card>
     );

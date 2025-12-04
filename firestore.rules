@@ -2,62 +2,60 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-
+    
     function isSignedIn() {
       return request.auth != null;
     }
-
+    
     function isAdmin() {
-      // In a real app, you might check for a custom claim or a role in the user's doc
-      return exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+      return exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
     }
-
-    // ---------- Users ----------
+    
+    function isOwner(uid) {
+      return request.auth.uid == uid;
+    }
+    
+    // Users collection
     match /users/{userId} {
-      allow read: if true;
-      allow write: if isSignedIn() && request.auth.uid == userId;
-
-      match /user_votes/{suggestionId} {
-        allow get, list: if isSignedIn() && request.auth.uid == userId;
-        allow create: if isSignedIn() && request.auth.uid == userId;
-        allow update, delete: if false;
+      allow read: if isSignedIn() && isOwner(userId);
+      allow create: if isSignedIn() && isOwner(userId);
+      allow update: if isSignedIn() && (isOwner(userId) || isAdmin());
+    }
+    
+    // Suggestions collection
+    match /suggestions/{suggestionId} {
+      allow read: if true; // Public read
+      allow create: if isSignedIn() && 
+        request.resource.data.authorUid == request.auth.uid;
+      allow update: if isSignedIn() && 
+        (isOwner(resource.data.authorUid) || isAdmin());
+      allow delete: if isSignedIn() && 
+        (isOwner(resource.data.authorUid) || isAdmin());
+      
+      // Comments subcollection
+      match /comments/{commentId} {
+        allow read: if true; // Public read
+        allow create: if isSignedIn() && 
+          request.resource.data.authorUid == request.auth.uid;
+        allow delete: if isSignedIn() && 
+          (isOwner(resource.data.authorUid) || isAdmin());
       }
     }
-
-    // ---------- Suggestions ----------
-    match /suggestions/{suggestionId} {
-      allow get, list: if true;
-      allow create: if isSignedIn() && request.resource.data.authorUid == request.auth.uid;
-
-      allow update: if isSignedIn() &&
-        (
-          (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['upvotesCount']) &&
-           request.resource.data.upvotesCount == resource.data.upvotesCount + 1)
-          || (request.auth.uid == resource.data.authorUid)
-          || isAdmin()
-        );
-
-      allow delete: if isSignedIn() && (request.auth.uid == resource.data.authorUid || isAdmin());
-
-      // ---------- Comments ----------
-      match /comments/{commentId} {
-        // ✅ Everyone can read or list comments
-        allow get, list: if true;
-
-        // ✅ Signed-in users can comment (allowing serverTimestamp and display info)
-        allow create: if isSignedIn() &&
-          request.resource.data.authorUid == request.auth.uid &&
-          request.resource.data.text is string &&
-          request.resource.data.createdAt != null &&
-          request.resource.data.authorDisplayName is string &&
-          request.resource.data.authorPhotoURL is string;
-
-        // ✅ Delete only by author or admin
-        allow delete: if isSignedIn() &&
-          (request.auth.uid == resource.data.authorUid || isAdmin());
-
-        allow update: if false;
-      }
+    
+    // Votes collection
+    match /votes/{voteId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && 
+        request.resource.data.voterUid == request.auth.uid &&
+        request.resource.data.voteId == request.auth.uid + '_' + request.resource.data.suggestionId;
+      allow delete: if isSignedIn() && 
+        isOwner(resource.data.voterUid);
+    }
+    
+    // Admin roles collection
+    match /roles_admin/{uid} {
+      allow read: if true; // Needed for isAdmin() function
+      allow write: if false; // Managed manually or by super admin function
     }
   }
 }
